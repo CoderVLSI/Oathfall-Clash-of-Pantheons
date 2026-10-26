@@ -52,6 +52,8 @@ jobs:
           unzip -j /tmp/templates.tpz 'templates/android_debug.apk' 'templates/version.txt' -d ~/.local/share/godot/export_templates/${GODOT_VERSION}.stable
       - name: Add Godot to PATH
         run: echo "$HOME/.local/bin" >> "$GITHUB_PATH"
+      - name: Set up Android command-line tools
+        uses: android-actions/setup-android@v3
       - name: Install Android SDK components
         shell: bash
         run: |
