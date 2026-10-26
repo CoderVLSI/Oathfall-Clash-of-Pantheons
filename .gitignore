@@ -1,0 +1,6 @@
+.godot/
+build/
+exports/
+.env
+.env.*
+*.log
