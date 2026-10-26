@@ -15,6 +15,7 @@ concurrency:
 
 env:
   GODOT_VERSION: 4.7.1
+  GAME_VERSION: 0.1.1
   GODOT_ANDROID_KEYSTORE_DEBUG_PATH: /home/runner/.android/debug.keystore
   GODOT_ANDROID_KEYSTORE_DEBUG_USER: androiddebugkey
   GODOT_ANDROID_KEYSTORE_DEBUG_PASSWORD: android
@@ -86,12 +87,12 @@ jobs:
       - name: Export debug APK
         run: |
           mkdir -p build
-          godot --headless --path . --export-debug Android build/Oathfall-0.1.0-debug.apk
-          "$ANDROID_HOME/build-tools/35.0.1/apksigner" verify --verbose build/Oathfall-0.1.0-debug.apk
+          godot --headless --path . --export-debug Android "build/Oathfall-${GAME_VERSION}-debug.apk"
+          "$ANDROID_HOME/build-tools/35.0.1/apksigner" verify --verbose "build/Oathfall-${GAME_VERSION}-debug.apk"
       - name: Upload installable APK
         uses: actions/upload-artifact@v4
         with:
           name: Oathfall-Android-debug-${{ github.run_number }}
-          path: build/Oathfall-0.1.0-debug.apk
+          path: build/*.apk
           if-no-files-found: error
           retention-days: 30

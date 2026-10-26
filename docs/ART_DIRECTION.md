@@ -23,5 +23,6 @@ Premium hand-painted mythology TCG, antique gold and midnight navy, atmospheric 
 - `assets/cards/art/raider.png`: mortal Norse warrior, braided beard, chainmail and fur, axe and round shield, fjord and longship.
 - `assets/cards/card_back.png`: universal full-bleed portrait navy enamel back, gold celestial oath rings around a turquoise rift, exact title “OATHFALL” and subtitle “CLASH OF PANTHEONS”. Shared by all cards and factions.
 - `assets/ui/app_icon.png`: square gold broken oath ring around a turquoise rift, midnight navy background, no text, centered safe zone.
+- `assets/ui/app_icon_v2.png`: new phone launcher icon for v0.1.1; bold broken-gold oath ring, sharply defined teal lightning rift, restrained card silhouette on navy, no text. Generated with built-in ImageGen; original icon preserved.
 
 Spells currently reuse related deity/character portraits. Rarity, cost, name, concise on-card summaries, full inspected rules, and current combat statistics remain live UI layers.
