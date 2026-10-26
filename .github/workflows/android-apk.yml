@@ -1,0 +1,92 @@
+name: Build Android APK
+
+on:
+  push:
+    branches: [main, master]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: android-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  GODOT_VERSION: 4.7.1
+  GODOT_ANDROID_KEYSTORE_DEBUG_PATH: /home/runner/.android/debug.keystore
+  GODOT_ANDROID_KEYSTORE_DEBUG_USER: androiddebugkey
+  GODOT_ANDROID_KEYSTORE_DEBUG_PASSWORD: android
+
+jobs:
+  build-apk:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+      - name: Cache Godot editor and Android template
+        id: godot-cache
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.local/bin/godot
+            ~/.local/share/godot/export_templates/4.7.1.stable
+          key: godot-4.7.1-linux-android-v1
+      - name: Install Godot 4.7.1
+        if: steps.godot-cache.outputs.cache-hit != 'true'
+        shell: bash
+        run: |
+          set -euo pipefail
+          base="https://github.com/godotengine/godot-builds/releases/download/${GODOT_VERSION}-stable"
+          curl --fail --location --retry 3 "$base/Godot_v${GODOT_VERSION}-stable_linux.x86_64.zip" -o /tmp/godot.zip
+          curl --fail --location --retry 3 "$base/Godot_v${GODOT_VERSION}-stable_export_templates.tpz" -o /tmp/templates.tpz
+          mkdir -p ~/.local/bin ~/.local/share/godot/export_templates/${GODOT_VERSION}.stable
+          unzip -j /tmp/godot.zip -d /tmp/godot-editor
+          mv /tmp/godot-editor/Godot_v${GODOT_VERSION}-stable_linux.x86_64 ~/.local/bin/godot
+          chmod +x ~/.local/bin/godot
+          unzip -j /tmp/templates.tpz 'templates/android_debug.apk' 'templates/version.txt' -d ~/.local/share/godot/export_templates/${GODOT_VERSION}.stable
+      - name: Add Godot to PATH
+        run: echo "$HOME/.local/bin" >> "$GITHUB_PATH"
+      - name: Install Android SDK components
+        shell: bash
+        run: |
+          set -euo pipefail
+          echo "ANDROID_HOME=$ANDROID_SDK_ROOT" >> "$GITHUB_ENV"
+          sdkmanager "platform-tools" "build-tools;35.0.1" "platforms;android-35"
+      - name: Preserve debug signing identity
+        uses: actions/cache@v4
+        with:
+          path: ~/.android/debug.keystore
+          key: oathfall-debug-signing-v1
+      - name: Create debug keystore if needed
+        shell: bash
+        run: |
+          mkdir -p ~/.android
+          if [ ! -f ~/.android/debug.keystore ]; then
+            keytool -genkeypair -keystore ~/.android/debug.keystore -storepass android -alias androiddebugkey -keypass android -dname "CN=Android Debug,O=Android,C=US" -keyalg RSA -keysize 2048 -validity 10000
+          fi
+      - name: Import assets
+        run: godot --headless --path . --editor --import --quit
+      - name: Test battle rules and complete simulated matches
+        run: godot --headless --path . --script res://tests/test_rules.gd
+      - name: Test menus, targeting, results, and AI turns
+        run: godot --headless --path . --script res://tests/test_ui.gd
+      - name: Configure Android SDK and Java paths
+        run: godot --headless --path . --editor --script res://tools/configure_android.gd
+      - name: Export debug APK
+        run: |
+          mkdir -p build
+          godot --headless --path . --export-debug Android build/Oathfall-0.1.0-debug.apk
+          "$ANDROID_HOME/build-tools/35.0.1/apksigner" verify --verbose build/Oathfall-0.1.0-debug.apk
+      - name: Upload installable APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: Oathfall-Android-debug-${{ github.run_number }}
+          path: build/Oathfall-0.1.0-debug.apk
+          if-no-files-found: error
+          retention-days: 30
