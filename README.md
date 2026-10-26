@@ -16,7 +16,9 @@ Full instructions are also available in the main menu. Completed matches and sou
 
 ## Android
 
-The first debug APK is exported to `build/Oathfall-0.1.0-debug.apk` (build output is excluded from Git). The package is `com.codervlsi.oathfall`, in landscape, supporting ARMv7 and ARM64 devices. Tap input maps to the same controls as mouse input.
+The latest debug APK is exported to `build/Oathfall-0.1.1-debug.apk` (build output is excluded from Git). The package is `com.codervlsi.oathfall`, in landscape, supporting ARMv7 and ARM64 devices on Android 7.0/API 24 and newer. Tap input maps to the same controls as mouse input. Version 0.1.1 includes the new Oathfall launcher icon.
+
+Installable testing builds are attached to the repository's [GitHub Releases](https://github.com/CoderVLSI/Oathfall-Clash-of-Pantheons/releases).
 
 GitHub Actions builds an installable debug APK on pushes to `main`/`master`, pull requests, and manual runs. Download it from the run's **Artifacts** section. This is a testing build, not a Play Store release. CI preserves its debug key using the Actions cache; a local APK and CI APK may need an uninstall between them because they use different debug signing identities.
 
@@ -28,7 +30,7 @@ Local export requires Godot 4.7.1 Android export templates, JDK 17, Android SDK 
 godot --headless --path . --editor --import --quit
 godot --headless --path . --script res://tests/test_rules.gd
 godot --headless --path . --script res://tests/test_ui.gd
-godot --headless --path . --export-debug Android build/Oathfall-0.1.0-debug.apk
+godot --headless --path . --export-debug Android build/Oathfall-0.1.1-debug.apk
 ```
 
 The rules suite covers combat, target validation, Guard, Rush, healing, fatigue, victory/defeat/draws, board limits, and 40 seeded complete matches. The UI suite covers menu navigation, both decks, confirmed plays, targeting, results, and AI turn completion. `tests/capture_screens.gd` produces visual QA screenshots in `qa/`.
