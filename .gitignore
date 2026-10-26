@@ -4,3 +4,6 @@ exports/
 .env
 .env.*
 *.log
+qa/
+*.keystore
+export_credentials.cfg
