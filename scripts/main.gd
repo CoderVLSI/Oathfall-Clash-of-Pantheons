@@ -41,6 +41,7 @@ var builder_badges: Dictionary = {}
 var builder_panel: Control
 var fx_layer: Control
 var music_player: AudioStreamPlayer
+var power_mode := false
 var unit_positions: Dictionary = {}
 var unit_views: Dictionary = {}
 
@@ -254,6 +255,11 @@ func show_factions(mode: String = "duel") -> void:
   label(content,info.title,Rect2(x+180,y+14,185,90),20,GOLD,DISPLAY).autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
   var desc := label(content,info.text,Rect2(x+14,y+262,345,70),15,CREAM)
   desc.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+  var power_info: Dictionary = DB.hero_power(faction)
+  label(content,"HERO POWER · %d" % power_info.cost,Rect2(x+180,y+178,185,20),12,TEAL,BOLD)
+  label(content,power_info.name,Rect2(x+180,y+196,185,24),16,GOLD,BOLD)
+  var power_text := label(content,power_info.text,Rect2(x+180,y+220,185,40),13,Color("b7c3cc"))
+  power_text.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
   var label_text := "PLAY " + faction.to_upper() if mode == "duel" else "CAMPAIGN  %d / %d" % [profile.stage_cleared(faction),profile.STAGES]
   button(content,label_text,Rect2(x+180,y+120,182,48),(func(): start_match(faction)) if mode == "duel" else (func(): show_campaign(faction)),true)
  button(content,"BACK",Rect2(60,40,150,48),show_menu)
@@ -283,7 +289,7 @@ func close_modal() -> void:
 
 func show_rules() -> void:
  var body := open_modal("THE RULES OF OATHFALL",1060,760)
- var text := "WIN THE DUEL\nReduce the opposing Sanctum from 25 health to zero. Both starter decks contain 24 cards.\n\nYOUR TURN\nGain one maximum Power (up to 10), refill it, ready your units, and draw one card.\nTap a card in your hand, then SUMMON / CAST in the left panel. Damage spells need a target.\n\nCOMBAT\nTap a ready friendly unit, then an enemy unit or the enemy Sanctum. Both units deal damage\nsimultaneously. Every unit attacks once per turn. New units rest until your next turn.\n\nKEYWORDS\nGUARD — Defeat enemy Guards before attacking other units or the Sanctum.\nRUSH — A newly summoned unit may attack units immediately, but not the Sanctum.\nARRIVAL — An effect happens once when the unit enters the battlefield.\nWARD — The first damage the unit would take is prevented.\nLIFESTEAL — Damage the unit deals restores your Sanctum.\nDEATHRATTLE — An effect happens when the unit dies.\nDamage spells ignore Guard. Healing never exceeds 25 health. Your board holds 5 units.\n\nRUNNING OUT OF CARDS\nAn empty deck deals increasing fatigue damage each draw. Full hands (9 cards) burn new draws.\n\nCONTROLS\nClick or tap cards to inspect and select them. Use the left panel to confirm a play.\nCancel a selection with Escape or CANCEL. End Turn gives control to the AI.\nThe match menu pauses AI actions. Concede ends the match; rematch starts a fresh duel."
+ var text := "WIN THE DUEL\nReduce the opposing Sanctum from 25 health to zero. Both starter decks contain 24 cards.\n\nYOUR TURN\nGain one maximum Power (up to 10), refill it, ready your units, and draw one card.\nTap a card in your hand, then SUMMON / CAST in the left panel. Damage spells need a target.\n\nCOMBAT\nTap a ready friendly unit, then an enemy unit or the enemy Sanctum. Both units deal damage\nsimultaneously. Every unit attacks once per turn. New units rest until your next turn.\n\nKEYWORDS\nGUARD — Defeat enemy Guards before attacking other units or the Sanctum.\nRUSH — A newly summoned unit may attack units immediately, but not the Sanctum.\nARRIVAL — An effect happens once when the unit enters the battlefield.\nHERO POWER — Each pantheon has an ability usable once per turn for its Power cost. Press the HERO POWER button, then pick a target if asked.\nWARD — The first damage the unit would take is prevented.\nLIFESTEAL — Damage the unit deals restores your Sanctum.\nDEATHRATTLE — An effect happens when the unit dies.\nDamage spells ignore Guard. Healing never exceeds 25 health. Your board holds 5 units.\n\nRUNNING OUT OF CARDS\nAn empty deck deals increasing fatigue damage each draw. Full hands (9 cards) burn new draws.\n\nCONTROLS\nClick or tap cards to inspect and select them. Use the left panel to confirm a play.\nCancel a selection with Escape or CANCEL. End Turn gives control to the AI.\nThe match menu pauses AI actions. Concede ends the match; rematch starts a fresh duel."
  var node := label(body,text,Rect2(38,93,980,630),20,CREAM)
  node.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 
@@ -326,6 +332,7 @@ func start_match(faction: String, stage: int = 0, deck_cards: Array = []) -> voi
  game.ai_level = match_level
  unit_positions.clear()
  unit_views.clear()
+ power_mode = false
  game.start(faction,0,match_rival,deck_cards)
  if bonus_hp > 0: game.sides[1].hp += bonus_hp
  match_rival = game.sides[1].faction
@@ -366,7 +373,7 @@ func add_card(parent: Node, data: Dictionary, pos: Vector2, dimensions: Vector2,
  view.index = idx
  view.playable = valid
  view.selected = (mode == "hand" and selection == idx) or (mode == "board" and data.get("uid",-2) == attacker)
- view.targetable = mode == "enemy" and target_valid(data.get("uid",-1))
+ view.targetable = (mode == "enemy" and target_valid(data.get("uid",-1))) or (mode == "board" and power_mode and game.hero_power_of(0).target == "ally" and game.can_use_power(0,data.get("uid",-1)))
  view.chosen.connect(on_card_chosen)
  view.inspected.connect(func(card): inspect(card.data))
  parent.add_child(view)
@@ -374,6 +381,7 @@ func add_card(parent: Node, data: Dictionary, pos: Vector2, dimensions: Vector2,
 
 func target_valid(uid: int) -> bool:
  if busy or game == null or game.current != 0: return false
+ if power_mode: return uid >= 0 and game.hero_power_of(0).target == "enemy" and game.can_use_power(0,uid)
  if selection >= 0 and selection < game.sides[0].hand.size():
   return DB.card(game.sides[0].hand[selection]).get("effect","") == "damage"
  return attacker >= 0 and game.can_attack(0,attacker,uid)
@@ -437,9 +445,16 @@ func render_battle() -> void:
  var end := button(content,"END TURN" if not busy else "RIVAL THINKING…",Rect2(1366,322,193,60),end_player_turn,true)
  end.disabled = busy or game.current!=0
  button(content,"CANCEL",Rect2(1366,394,193,40),cancel_selection).disabled = busy
- label(content,"BATTLE CHRONICLE",Rect2(1368,456,205,30),14,GOLD,BOLD)
- for i in range(mini(game.history.size(),7)):
-  var entry := label(content,game.history[i],Rect2(1368,500+i*47,191,45),14,Color("bac4cc") if i==0 else Color("8394a3"))
+ var hero: Dictionary = game.hero_power_of(0)
+ var hero_ready: bool = game.current == 0 and not busy and ((game.can_use_power(0)) if hero.target == "none" else (not game.power_targets(0).is_empty()))
+ var hero_button := button(content,"%s · %d" % [hero.name.to_upper(),hero.cost],Rect2(1366,444,193,56),hero_power_pressed)
+ hero_button.disabled = not hero_ready and not power_mode
+ hero_button.tooltip_text = hero.text
+ hero_button.add_theme_font_size_override("font_size",15)
+ if power_mode: hero_button.add_theme_color_override("font_color",TEAL)
+ label(content,"BATTLE CHRONICLE",Rect2(1368,508,205,26),14,GOLD,BOLD)
+ for i in range(mini(game.history.size(),5)):
+  var entry := label(content,game.history[i],Rect2(1368,536+i*47,191,45),14,Color("bac4cc") if i==0 else Color("8394a3"))
   entry.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
  panel(content,Rect2(273,393,1035,28),Color("0a1924ce"),Color("5f68534a"),4)
  var hint := label(content,notice,Rect2(289,393,1000,27),16,TEAL if attacker>=0 or selection>=0 else CREAM)
@@ -478,6 +493,10 @@ func inspect(data: Dictionary) -> void:
 func on_card_chosen(view) -> void:
  if busy or game.current!=0 or game.winner!=-1 or is_instance_valid(modal): return
  inspected_data = view.data.duplicate(true)
+ if power_mode:
+  if (view.mode == "board" and game.hero_power_of(0).target == "ally") or (view.mode == "enemy" and game.hero_power_of(0).target == "enemy"): use_hero_power(view.data.uid)
+  else: notice = "Choose a valid target for %s, or press CANCEL." % game.hero_power_of(0).name; render_battle()
+  return
  if view.mode == "hand":
   selection = view.index
   attacker = -1
@@ -520,7 +539,34 @@ func choose_enemy(uid: int) -> void:
  else: notice = "Select a ready ally or damage spell. Enemy Guards protect other targets."
  render_battle()
 
+func use_hero_power(uid: int = -1) -> void:
+ if busy or game.current != 0 or is_instance_valid(modal): return
+ if game.use_power(0,uid):
+  power_mode = false
+  selection = -1
+  attacker = -1
+  sound("buff")
+  notice = game.history[0]
+ else: notice = "That is not a valid target for %s." % game.hero_power_of(0).name
+ render_battle()
+
+func hero_power_pressed() -> void:
+ if busy or game.current != 0 or is_instance_valid(modal): return
+ var power: Dictionary = game.hero_power_of(0)
+ if power.target == "none":
+  use_hero_power(-1)
+  return
+ if game.power_targets(0).is_empty():
+  notice = "%s has no valid target right now." % power.name
+ else:
+  power_mode = not power_mode
+  selection = -1
+  attacker = -1
+  notice = ("%s: choose %s." % [power.name,"a friendly unit" if power.target == "ally" else "an enemy unit"]) if power_mode else "Selection cleared."
+ render_battle()
+
 func cancel_selection() -> void:
+ power_mode = false
  selection = -1
  attacker = -1
  notice = "Selection cleared."
@@ -528,6 +574,7 @@ func cancel_selection() -> void:
 
 func end_player_turn() -> void:
  if busy or game.current!=0 or is_instance_valid(modal): return
+ power_mode = false
  selection = -1
  attacker = -1
  busy = true
@@ -831,6 +878,12 @@ func play_fx() -> void:
     sound("summon")
    "turn":
     if game.turn > 1: turn_banner("YOUR TURN" if event.side == 0 else "RIVAL'S TURN",TEAL if event.side == 0 else Color("edaf8d"))
+   "power":
+    var power_pos: Vector2 = fx_position(event)
+    float_text(game.hero_power_of(event.side).name,power_pos + Vector2(0,-40),Color("f4cc79"),24)
+    ring(power_pos,Color("f4cc79"))
+    flash_screen(Color("f4cc79"))
+    sound("buff")
    "draw":
     if event.side == 0: sound("draw")
  return

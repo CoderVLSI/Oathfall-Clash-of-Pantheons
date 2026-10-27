@@ -221,6 +221,72 @@ func _initialize() -> void:
  var overheal := false
  for e in m.drain_fx(): if e.type=="heal": overheal=true
  expect(not overheal,"No heal event at full health")
+ # Pantheon Powers: one use per turn, Power cost, valid targets, and per-pantheon effects.
+ for faction in DB.FACTIONS:
+  var power: Dictionary=DB.hero_power(faction)
+  expect(power.cost>=2 and power.cost<=3 and ["none","ally","enemy"].has(power.target),"%s power is well formed" % faction)
+ m=power_fixture("Greek")
+ m.sides[0].board=[{"uid":1,"name":"A","attack":2,"hp":3,"ready":true,"fresh":false}]
+ expect(m.power_targets(0)==[1],"Greek power targets friendly units")
+ expect(not m.use_power(0,99),"Power rejects an unknown target")
+ expect(m.use_power(0,1) and m.sides[0].board[0].ward and m.sides[0].power==7,"Greek power grants Ward and spends 3 Power")
+ expect(not m.can_use_power(0,1) and m.power_targets(0).is_empty(),"Power is once per turn")
+ m.end_turn(0)
+ m.end_turn(1)
+ expect(m.sides[0].power_used==false and not m.can_use_power(0,1),"Power resets each turn; Ward cannot be stacked")
+ m=power_fixture("Greek")
+ m.sides[0].power=2
+ m.sides[0].board=[{"uid":1,"name":"A","attack":2,"hp":3}]
+ expect(not m.use_power(0,1),"Power needs enough Power")
+ m=power_fixture("Greek")
+ m.current=1
+ m.sides[0].board=[{"uid":1,"name":"A","attack":2,"hp":3}]
+ expect(not m.use_power(0,1),"Power cannot be used on the rival's turn")
+ m=power_fixture("Norse")
+ m.sides[0].board=[{"uid":1,"name":"A","attack":2,"hp":3,"ready":true,"fresh":false}]
+ m.use_power(0,1)
+ expect(m.sides[0].board[0].attack==4,"Norse power adds 2 Attack")
+ m.end_turn(0)
+ expect(m.sides[0].board[0].attack==2,"Norse bonus ends with the turn")
+ m=power_fixture("Roman")
+ m.sides[0].board=[{"uid":1,"name":"A","attack":2,"hp":3,"ready":false,"fresh":false},{"uid":2,"name":"B","attack":2,"hp":3,"ready":true,"fresh":false},{"uid":3,"name":"C","attack":2,"hp":3,"ready":false,"fresh":true}]
+ expect(m.power_targets(0)==[1],"Roman power targets only units that already acted")
+ m.use_power(0,1)
+ expect(m.sides[0].board[0].ready,"Roman power readies a unit")
+ m=power_fixture("Egyptian")
+ m.sides[0].hp=20
+ expect(m.power_targets(0)==[-1] and m.use_power(0),"Egyptian power needs no target")
+ expect(m.sides[1].hp==24 and m.sides[0].hp==21,"Egyptian power drains the Sanctum")
+ m=power_fixture("Japanese")
+ m.sides[1].board=[{"uid":5,"name":"E","attack":1,"hp":1},{"uid":6,"name":"F","attack":1,"hp":3}]
+ m.sides[0].board=[{"uid":1,"name":"A","attack":1,"hp":3}]
+ expect(not m.can_use_power(0,1),"Japanese power cannot target allies")
+ m.use_power(0,5)
+ expect(m.sides[1].board.size()==1 and m.sides[1].board[0].uid==6,"Japanese power kills a 1-health unit")
+ m=power_fixture("Chinese")
+ m.sides[0].hp=20
+ m.sides[0].deck=["hoplite","hoplite"]
+ m.use_power(0)
+ expect(m.sides[0].hand.size()==1 and m.sides[0].hp==21,"Chinese power draws and heals")
+ m=power_fixture("Aztec")
+ m.sides[0].board=[{"uid":1,"name":"A","attack":2,"hp":3}]
+ m.use_power(0,1)
+ expect(m.sides[0].board[0].attack==3 and m.sides[0].board[0].hp==4,"Aztec power grants +1/+1")
+ # The AI spends spare Power on its hero ability, and the power event is emitted.
+ m=power_fixture("Japanese")
+ m.current=1
+ m.sides[1].faction="Japanese"
+ m.sides[1].power=5
+ m.sides[1].hand=[]
+ m.sides[1].board=[]
+ m.sides[0].board=[{"uid":9,"name":"Tgt","attack":2,"hp":1}]
+ m.fx.clear()
+ var ai_power: Dictionary=m.ai_power_action()
+ expect(ai_power.get("type","")=="power" and ai_power.target==9,"AI picks a killable target for Fox-fire")
+ expect(m.execute_ai(ai_power) and m.sides[0].board.is_empty(),"AI executes its hero power")
+ var saw_power := false
+ for e in m.drain_fx(): if e.type=="power": saw_power=true
+ expect(saw_power,"Using a power emits a power event")
  # Every card definition is well formed and every deck is legal.
  for id in DB.CARDS:
   var c=DB.card(id)
@@ -319,3 +385,12 @@ func duel(seed_value: int, faction: String, levels: Array) -> int:
    elif m.winner==1: m.winner=0
   if not acted: break
  return m.winner
+func power_fixture(faction: String):
+ var m = MATCH.new()
+ m.start(faction,321,"Norse" if faction != "Norse" else "Greek")
+ for s in m.sides:
+  s.hand=[]
+  s.board=[]
+ m.sides[0].power=10
+ m.sides[0].max_power=10
+ return m

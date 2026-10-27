@@ -128,6 +128,27 @@ func run() -> void:
  app.builder_play()
  await process_frame
  verify(app.screen=="battle" and app.game.sides[0].faction=="Japanese" and app.match_deck.size()==24,"Custom deck match starts")
+ # Hero power flow in the battle UI.
+ app.start_match("Greek")
+ await process_frame
+ app.game.sides[0].power=10
+ app.game.sides[0].board=[{"uid":501,"name":"Ally","attack":2,"hp":3,"health":3,"ready":true,"fresh":false,"cost":1,"category":"Mortal","rarity":"Common","faction":"Greek","text":"t","art":"hoplite"}]
+ app.render_battle()
+ await process_frame
+ app.hero_power_pressed()
+ verify(app.power_mode,"Targeted hero power enters targeting mode")
+ app.use_hero_power(501)
+ await process_frame
+ verify(not app.power_mode and app.game.sides[0].board[0].get("ward",false) and app.game.sides[0].power==7,"Hero power applies Ward through the UI")
+ app.hero_power_pressed()
+ verify(not app.power_mode,"Used hero power cannot be reactivated")
+ app.start_match("Chinese")
+ await process_frame
+ var hand_before: int=app.game.sides[0].hand.size()
+ app.game.sides[0].power=10
+ app.hero_power_pressed()
+ await process_frame
+ verify(app.game.sides[0].hand.size()==hand_before+1 and not app.power_mode,"Targetless hero power fires immediately")
  app.generation += 1
  app.queue_free()
  await process_frame

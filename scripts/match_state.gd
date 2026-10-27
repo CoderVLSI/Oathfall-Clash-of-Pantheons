@@ -55,7 +55,7 @@ func start(faction: String = "Greek", seed_value: int = 0, rival: String = "", p
    var temp = deck[i]
    deck[i] = deck[j]
    deck[j] = temp
-  sides.append({"faction":f,"hp":MAX_HP,"power":0,"max_power":0,"deck":deck,"hand":[],"board":[],"fatigue":0})
+  sides.append({"faction":f,"hp":MAX_HP,"power":0,"max_power":0,"deck":deck,"hand":[],"board":[],"fatigue":0,"power_used":false})
  for p in range(2):
   for i in range(4): draw_card(p)
  begin_turn(0)
@@ -85,6 +85,7 @@ func begin_turn(p: int) -> void:
  var s: Dictionary = sides[p]
  s.max_power = mini(s.max_power + 1, 10)
  s.power = s.max_power
+ s.power_used = false
  for unit in s.board:
   unit.ready = true
   unit.fresh = false
@@ -94,6 +95,10 @@ func begin_turn(p: int) -> void:
 
 func end_turn(p: int) -> bool:
  if winner != -1 or p != current: return false
+ for unit in sides[p].board:
+  if unit.get("temp_attack",0) > 0:
+   unit.attack -= unit.temp_attack
+   unit.temp_attack = 0
  begin_turn(1-p)
  return true
 
@@ -308,16 +313,22 @@ func execute_ai(action: Dictionary) -> bool:
  match action.get("type",""):
   "play": return play_card(1,action.index,action.target)
   "attack": return attack(1,action.uid,action.target)
+  "power": return use_power(1,action.target)
   "end": return end_turn(1)
  return false
 
 # Dispatches to the AI for the configured difficulty. Returns an action without changing state.
 func ai_action() -> Dictionary:
  if current != 1 or winner != -1: return {}
+ var action: Dictionary
  match ai_level:
-  0: return ai_action_easy()
-  2: return ai_action_hard()
- return ai_action_normal()
+  0: action = ai_action_easy()
+  2: action = ai_action_hard()
+  _: action = ai_action_normal()
+ if action.get("type","") == "end" and (ai_level > 0 or rng.randf() < 0.5):
+  var extra := ai_power_action()
+  if not extra.is_empty(): return extra
+ return action
 
 # Easy: plays and attacks at random, only occasionally noticing lethal.
 func ai_action_easy() -> Dictionary:
@@ -431,3 +442,94 @@ func ai_action_hard() -> Dictionary:
  if not best_attack.is_empty(): return best_attack
  if best_play >= 0: return {"type":"play","index":best_play,"target":best_target}
  return {"type":"end"}
+
+# --- Pantheon Power -------------------------------------------------------------------
+func hero_power_of(p: int) -> Dictionary:
+ return DB.hero_power(sides[p].faction)
+
+func power_target_ok(effect: String, unit: Dictionary) -> bool:
+ match effect:
+  "ward": return not unit.get("ward",false)
+  "orders": return not unit.get("ready",false) and not unit.get("fresh",false)
+ return true
+
+func can_use_power(p: int, target_uid: int = -1) -> bool:
+ if winner != -1 or current != p or sides[p].power_used: return false
+ var power := hero_power_of(p)
+ if power.cost > sides[p].power: return false
+ match power.target:
+  "ally":
+   var unit := unit_by_uid(p,target_uid)
+   return not unit.is_empty() and power_target_ok(power.effect,unit)
+  "enemy": return not unit_by_uid(1-p,target_uid).is_empty()
+ return true
+
+# Valid targets for the hero power right now: unit uids, [-1] for a targetless power, or [].
+func power_targets(p: int) -> Array:
+ var power := hero_power_of(p)
+ var result: Array = []
+ if power.target == "none":
+  if can_use_power(p): result.append(-1)
+  return result
+ var side: int = p if power.target == "ally" else 1 - p
+ for unit in sides[side].board:
+  if can_use_power(p,unit.uid): result.append(unit.uid)
+ return result
+
+func use_power(p: int, target_uid: int = -1) -> bool:
+ if not can_use_power(p,target_uid): return false
+ var s: Dictionary = sides[p]
+ var power := hero_power_of(p)
+ s.power -= power.cost
+ s.power_used = true
+ fx_add("power",p,target_uid,0,power.effect)
+ match power.effect:
+  "ward": unit_by_uid(p,target_uid).ward = true
+  "fury":
+   var unit := unit_by_uid(p,target_uid)
+   unit.attack += 2
+   unit.temp_attack = unit.get("temp_attack",0) + 2
+  "orders": unit_by_uid(p,target_uid).ready = true
+  "whisper":
+   damage_sanctum(1-p,1)
+   heal_sanctum(p,1)
+  "foxfire": hurt(unit_by_uid(1-p,target_uid),1)
+  "harmony":
+   draw_card(p)
+   heal_sanctum(p,1)
+  "blessing":
+   var unit := unit_by_uid(p,target_uid)
+   unit.attack += 1
+   unit.hp += 1
+   fx_add("buff",p,target_uid)
+ log_event("%s used %s." % [s.faction,power.name])
+ cleanup()
+ return true
+
+# Spends leftover Power on the hero ability when it is clearly useful.
+func ai_power_action() -> Dictionary:
+ var p := 1
+ var targets := power_targets(p)
+ if targets.is_empty(): return {}
+ var power := hero_power_of(p)
+ var best := -1
+ var best_score := -1000.0
+ for uid in targets:
+  var score := 0.0
+  match power.target:
+   "none": score = 1.0
+   "ally":
+    var unit := unit_by_uid(p,uid)
+    match power.effect:
+     "ward": score = unit.cost + (2.0 if unit.get("guard",false) else 0.0)
+     "fury": score = unit.attack + (3.0 if unit.get("ready",false) else -5.0)
+     "orders": score = unit.attack + 1.0
+     _: score = unit.cost + unit.attack
+   "enemy":
+    var unit := unit_by_uid(1-p,uid)
+    score = 5.0 if unit.hp <= 1 else 2.0 - unit.hp * 0.1 + unit.attack * 0.1
+  if score > best_score:
+   best_score = score
+   best = uid
+ if best_score < 0.0: return {}
+ return {"type":"power","target":best}

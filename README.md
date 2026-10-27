@@ -10,6 +10,7 @@ Open `project.godot` in Godot 4.7.1 and press F6 with `main.tscn` open, or F5 to
 - Each turn increases and refills Power (maximum 10), draws a card, and readies your units.
 - Click/tap a hand card, then confirm **Summon** or **Cast** in the inspector. Damage spells are cast by selecting an enemy unit or Sanctum.
 - Click/tap a ready friendly unit, then an enemy. New units rest for one turn. Guard units protect other targets. Rush can attack units immediately.
+- Each pantheon has a **Hero Power** (Aegis of Olympus, Runic Fury, Legion Orders, Whisper of Anubis, Fox-fire, Harmony of Qi, Solar Blessing): once per turn, spend its Power cost, then choose a target if it needs one.
 - Use **End Turn** to give control to the AI. The match menu pauses AI actions and allows conceding. Empty decks cause increasing fatigue damage.
 
 Full instructions are also available in the main menu. Completed matches and sound preferences save locally. Cards use one reusable scene with separate generated portraits, a frame, editable text, and live statistics. Hidden cards always use the same generated Oathfall back.

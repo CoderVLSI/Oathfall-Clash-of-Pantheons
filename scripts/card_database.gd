@@ -95,6 +95,20 @@ const CARDS = {
 
 const FACTIONS = ["Greek","Norse","Roman","Egyptian","Japanese","Chinese","Aztec"]
 
+# Pantheon Power: one hero ability per pantheon, usable once per turn for its Power cost.
+# target: "none" | "ally" (friendly unit) | "enemy" (enemy unit).
+const HERO_POWERS = {
+ "Greek": {"name":"Aegis of Olympus","cost":3,"target":"ally","effect":"ward","text":"Give a friendly unit Ward."},
+ "Norse": {"name":"Runic Fury","cost":2,"target":"ally","effect":"fury","text":"A friendly unit gets +2 Attack this turn."},
+ "Roman": {"name":"Legion Orders","cost":3,"target":"ally","effect":"orders","text":"Ready a friendly unit that already acted."},
+ "Egyptian": {"name":"Whisper of Anubis","cost":2,"target":"none","effect":"whisper","text":"Deal 1 damage to the enemy Sanctum and restore 1 to yours."},
+ "Japanese": {"name":"Fox-fire","cost":2,"target":"enemy","effect":"foxfire","text":"Deal 1 damage to an enemy unit."},
+ "Chinese": {"name":"Harmony of Qi","cost":2,"target":"none","effect":"harmony","text":"Draw a card and restore 1 to your Sanctum."},
+ "Aztec": {"name":"Solar Blessing","cost":3,"target":"ally","effect":"blessing","text":"A friendly unit gets +1/+1."}
+}
+
+static func hero_power(faction: String) -> Dictionary:
+ return HERO_POWERS.get(faction,HERO_POWERS["Greek"])
 # 24-card starter decks, one per pantheon.
 const DECKS = {
  "Greek": ["hoplite","hoplite","hoplite","hoplite","cerberus","cerberus","poseidon","poseidon","zeus","bolt","bolt","bolt","aegis","phalanx","phalanx","oracle","oracle","hydra","hydra","athena","aphrodite","prophecy","prophecy","triumph"],
