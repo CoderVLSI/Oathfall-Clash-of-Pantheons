@@ -91,11 +91,159 @@ func _initialize() -> void:
  m.play_card(0,0)
  uid=m.sides[0].board[0].uid
  expect(not m.can_attack(0,uid,-1) and m.can_attack(0,uid,99),"Rush respects unit-only restriction")
+ # Ward absorbs exactly one damage instance, from combat or spells.
+ m=fixture()
+ m.sides[0].hand=["phalanx"]
+ m.sides[1].hand=["bolt"]
+ m.play_card(0,0)
+ var warded: Dictionary=m.sides[0].board[0]
+ expect(warded.ward and warded.guard,"Phalanx enters with Ward and Guard")
+ m.current=1
+ m.sides[1].power=10
+ expect(m.play_card(1,0,warded.uid),"Spell can target warded unit")
+ expect(warded.hp==3 and not warded.ward,"Ward absorbs first damage entirely")
+ m.sides[1].hand=["bolt"]
+ m.play_card(1,0,warded.uid)
+ expect(m.sides[0].board.is_empty(),"Second hit kills the unit")
+ # Ward also blocks combat damage but still lets the warded unit strike.
+ m=fixture()
+ m.sides[0].board=[{"uid":1,"name":"A","attack":4,"hp":4,"ready":true,"fresh":false}]
+ m.sides[1].board=[{"uid":2,"name":"B","attack":2,"hp":3,"ward":true}]
+ m.attack(0,1,2)
+ expect(m.sides[1].board[0].hp==3 and not m.sides[1].board[0].ward,"Ward prevents combat damage once")
+ expect(m.sides[0].board[0].hp==2,"Warded defender still retaliates")
+ # Lifesteal heals the owner for damage dealt, to units or the Sanctum, and is capped.
+ m=fixture()
+ m.sides[0].hp=10
+ m.sides[0].board=[{"uid":1,"name":"Reaver","attack":3,"hp":2,"ready":true,"fresh":false,"lifesteal":true}]
+ m.sides[1].board=[{"uid":2,"name":"B","attack":1,"hp":5}]
+ m.attack(0,1,2)
+ expect(m.sides[0].hp==13,"Lifesteal heals on unit damage")
+ m.sides[0].board[0].ready=true
+ m.sides[1].board.clear()
+ m.attack(0,1,-1)
+ expect(m.sides[0].hp==16 and m.sides[1].hp==22,"Lifesteal heals on Sanctum damage")
+ m.sides[0].hp=24
+ m.sides[0].board[0].ready=true
+ m.attack(0,1,-1)
+ expect(m.sides[0].hp==25,"Lifesteal respects the health cap")
+ # Lifesteal on a defender heals its owner and does nothing through Ward.
+ m=fixture()
+ m.sides[0].board=[{"uid":1,"name":"A","attack":2,"hp":5,"ready":true,"fresh":false}]
+ m.sides[1].board=[{"uid":2,"name":"Leech","attack":2,"hp":5,"lifesteal":true}]
+ m.sides[1].hp=10
+ m.attack(0,1,2)
+ expect(m.sides[1].hp==12,"Defender lifesteal heals its owner")
+ m=fixture()
+ m.sides[0].board=[{"uid":1,"name":"A","attack":2,"hp":5,"ready":true,"fresh":false,"ward":true}]
+ m.sides[1].board=[{"uid":2,"name":"Leech","attack":2,"hp":5,"lifesteal":true}]
+ m.sides[1].hp=10
+ m.attack(0,1,2)
+ expect(m.sides[1].hp==10,"No lifesteal when Ward absorbs the damage")
+ # Deathrattles: draw, damage, chains, and simultaneous deaths.
+ m=fixture()
+ m.sides[0].hand=["hydra"]
+ m.sides[0].deck=["hoplite","hoplite","hoplite"]
+ m.play_card(0,0)
+ m.sides[0].board[0].hp=0
+ m.cleanup()
+ expect(m.sides[0].board.is_empty() and m.sides[0].hand.size()==2 and m.sides[0].deck.size()==1,"Hydra deathrattle draws two cards")
+ m=fixture()
+ m.sides[0].board=[{"uid":1,"name":"Garm","attack":4,"hp":0,"deathrattle":"damage","deathrattle_amount":3}]
+ m.cleanup()
+ expect(m.sides[1].hp==22,"Damage deathrattle hits enemy Sanctum")
+ m.sides[1].hp=3
+ m.sides[0].board=[{"uid":1,"name":"Garm","attack":4,"hp":0,"deathrattle":"damage","deathrattle_amount":3}]
+ m.cleanup()
+ expect(m.winner==0,"Deathrattle can win the game")
+ m=fixture()
+ m.sides[0].board=[{"uid":1,"name":"G0","attack":1,"hp":0,"deathrattle":"damage","deathrattle_amount":2}]
+ m.sides[1].board=[{"uid":2,"name":"G1","attack":1,"hp":0,"deathrattle":"heal","deathrattle_amount":4}]
+ m.sides[1].hp=10
+ m.cleanup()
+ expect(m.sides[1].hp==12 and m.sides[0].hp==25,"Both sides' deathrattles resolve")
+ # Arrival draw, arrival buff, and the buff/draw/sweep spells.
+ m=fixture()
+ m.sides[0].hand=["oracle","prophecy"]
+ m.sides[0].deck=["hoplite","hoplite","hoplite","hoplite"]
+ m.play_card(0,0)
+ expect(m.sides[0].hand.size()==2 and m.sides[0].deck.size()==3,"Arrival draw draws a card")
+ m.play_card(0,m.sides[0].hand.find("prophecy"))
+ expect(m.sides[0].deck.size()==1,"Draw spell draws its amount")
+ m=fixture()
+ m.sides[0].hand=["athena","triumph"]
+ m.sides[0].board=[{"uid":7,"name":"X","attack":2,"hp":2}]
+ m.play_card(0,0)
+ var athena: Dictionary=m.sides[0].board[1]
+ expect(m.sides[0].board[0].attack==3 and m.sides[0].board[0].hp==3,"Athena buffs other allies")
+ expect(athena.attack==3 and athena.hp==4,"Athena does not buff herself")
+ m.play_card(0,0)
+ expect(m.sides[0].board[0].attack==4 and athena.hp==5,"Buff spell affects every ally")
+ m=fixture()
+ m.sides[0].hand=["gale"]
+ m.sides[1].board=[{"uid":1,"name":"A","attack":1,"hp":2},{"uid":2,"name":"B","attack":1,"hp":3,"ward":true},{"uid":3,"name":"C","attack":1,"hp":5}]
+ m.play_card(0,0)
+ expect(m.sides[1].board.size()==2 and m.sides[1].board[0].hp==3 and not m.sides[1].board[0].ward and m.sides[1].board[1].hp==3,"Sweep damages all enemies and respects Ward")
+ # Presentation events mirror what happened, and draining empties the queue.
+ m=fixture()
+ m.fx.clear()
+ m.sides[0].hand=["hoplite","bolt"]
+ m.play_card(0,0)
+ var events: Array=m.drain_fx()
+ var kinds := []
+ for e in events: kinds.append(e.type)
+ expect(kinds.has("summon") and m.fx.is_empty(),"Summon emits an event and drain empties the queue")
+ m.sides[1].board=[{"uid":77,"name":"Dummy","attack":1,"hp":2,"ward":true}]
+ m.play_card(0,0,77)
+ events=m.drain_fx()
+ kinds=[]
+ for e in events: kinds.append(e.type)
+ expect(kinds.has("spell") and kinds.has("ward") and not kinds.has("death"),"Ward absorbs a spell and emits a ward event")
+ m.sides[0].hand=["bolt"]
+ m.play_card(0,0,77)
+ events=m.drain_fx()
+ var saw_damage := false
+ var saw_death := false
+ for e in events:
+  if e.type=="damage" and e.uid==77 and e.amount==3: saw_damage=true
+  if e.type=="death" and e.uid==77: saw_death=true
+ expect(saw_damage and saw_death,"Lethal spell emits damage and death events")
+ m.sides[0].hand=["aegis"]
+ m.sides[0].hp=20
+ m.play_card(0,0)
+ events=m.drain_fx()
+ var healed := 0
+ for e in events: if e.type=="heal": healed+=e.amount
+ expect(healed==5,"Heal emits the amount actually restored")
+ m.sides[0].hp=25
+ m.sides[0].hand=["aegis"]
+ m.play_card(0,0)
+ var overheal := false
+ for e in m.drain_fx(): if e.type=="heal": overheal=true
+ expect(not overheal,"No heal event at full health")
+ # Every card definition is well formed and every deck is legal.
+ for id in DB.CARDS:
+  var c=DB.card(id)
+  expect(c.cost>=0 and c.cost<=10 and c.has("text") and c.has("rarity"),"Card %s has core fields" % id)
+  if c.category=="Spell": expect(["damage","heal","draw","buff","sweep"].has(c.effect),"Spell %s has a known effect" % id)
+  else: expect(c.attack>0 and c.health>0,"Unit %s has stats" % id)
+ for faction in DB.FACTIONS:
+  var ids: Array=DB.deck(faction)
+  var unit_count := 0
+  for id in ids:
+   if DB.CARDS[id].category!="Spell": unit_count+=1
+  expect(unit_count>=14 and unit_count<=18,"%s deck has a healthy unit count" % faction)
+  var distinct := {}
+  for id in ids: distinct[id]=true
+  expect(distinct.size()>=12 and distinct.size()<=13,"%s has 12-13 distinct cards" % faction)
+  for id in distinct: expect(ResourceLoader.exists("res://assets/cards/art/%s.png" % DB.CARDS[id].art),"%s art exists for %s" % [faction,id])
+  expect(ids.size()==24,"%s deck has 24 cards" % faction)
+  for id in ids: expect(DB.CARDS[id].faction==faction,"%s deck contains only its own cards" % faction)
  # Simulate both starter decks through full games, using the same AI on each side.
  var results := [0,0,0]
- for seed_index in range(40):
+ for seed_index in range(60):
   m=MATCH.new()
-  m.start("Greek" if seed_index%2==0 else "Norse",seed_index+1)
+  m.start(DB.FACTIONS[seed_index%DB.FACTIONS.size()],seed_index+1)
   var iterations := 0
   while m.winner==-1 and iterations<2000:
    iterations+=1
@@ -123,5 +271,51 @@ func _initialize() -> void:
    if m.turn>100: break
   expect(m.winner!=-1,"Every seeded game terminates")
   if m.winner>=0: results[m.winner]+=1
- print("RULES: %d checks, %d failures; 40 completed simulations, results %s" % [checks,failures,str(results)])
+ # Difficulty ordering: a harder AI should beat an easier one over many mirrored matches.
+ var hard_wins := 0
+ var easy_wins := 0
+ for i in range(30):
+  var f: String=DB.FACTIONS[i%DB.FACTIONS.size()]
+  var w=duel(1000+i,f,[2,0])
+  if w==0: hard_wins+=1
+  elif w==1: easy_wins+=1
+  w=duel(2000+i,f,[0,2])
+  if w==1: hard_wins+=1
+  elif w==0: easy_wins+=1
+ print("AI levels: hard won %d, easy won %d of 60" % [hard_wins,easy_wins])
+ expect(hard_wins>easy_wins*2 and hard_wins>=35,"Hard AI clearly beats Easy AI")
+ var normal_vs_easy := 0
+ for i in range(20):
+  var f2: String=DB.FACTIONS[i%DB.FACTIONS.size()]
+  if duel(3000+i,f2,[1,0])==0: normal_vs_easy+=1
+  if duel(4000+i,f2,[0,1])==1: normal_vs_easy+=1
+ expect(normal_vs_easy>=26,"Normal AI beats Easy AI most of the time")
+ print("RULES: %d checks, %d failures; 60 completed simulations, results %s" % [checks,failures,str(results)])
  quit(0 if failures==0 else 1)
+
+# Plays a full match with the given AI level for each seat; returns the winner (0, 1, or 2 for a draw).
+func duel(seed_value: int, faction: String, levels: Array) -> int:
+ var m = MATCH.new()
+ m.start(faction,seed_value)
+ var iterations := 0
+ while m.winner==-1 and iterations<3000 and m.turn<120:
+  iterations+=1
+  var seat: int=m.current
+  m.ai_level=levels[seat]
+  if seat==0:
+   var tmp=m.sides[0]
+   m.sides[0]=m.sides[1]
+   m.sides[1]=tmp
+   m.current=1
+  var action: Dictionary=m.ai_action()
+  var acted: bool=m.execute_ai(action)
+  expect(acted,"Level %d AI actions are legal" % levels[seat])
+  if seat==0:
+   var tmp=m.sides[0]
+   m.sides[0]=m.sides[1]
+   m.sides[1]=tmp
+   m.current=1 if action.type=="end" else 0
+   if m.winner==0: m.winner=1
+   elif m.winner==1: m.winner=0
+  if not acted: break
+ return m.winner

@@ -1,6 +1,6 @@
 # Oathfall: Clash of Pantheons
 
-A fully 2D, offline mythology card battler built with Godot 4.7.1. Play either the Greek or Norse starter deck against an AI rival. All twelve card designs are unlocked.
+A fully 2D, offline mythology card battler built with Godot 4.7.1. Play any of seven pantheons (Greek, Norse, Roman, Egyptian, Japanese, Chinese, Aztec) against an AI rival from a random other pantheon. All 85 card designs are unlocked.
 
 ## Play
 
@@ -33,7 +33,7 @@ godot --headless --path . --script res://tests/test_ui.gd
 godot --headless --path . --export-debug Android build/Oathfall-0.1.1-debug.apk
 ```
 
-The rules suite covers combat, target validation, Guard, Rush, healing, fatigue, victory/defeat/draws, board limits, and 40 seeded complete matches. The UI suite covers menu navigation, both decks, confirmed plays, targeting, results, and AI turn completion. `tests/capture_screens.gd` produces visual QA screenshots in `qa/`.
+The rules suite covers combat, Ward, Lifesteal, Deathrattle, draw and buff effects, card-data validation, target validation, Guard, Rush, healing, fatigue, victory/defeat/draws, board limits, and 60 seeded complete matches across all seven pantheons. The UI suite covers menu navigation, both decks, confirmed plays, targeting, results, and AI turn completion. `tests/capture_screens.gd` produces visual QA screenshots in `qa/`.
 
 ## Art and tools
 

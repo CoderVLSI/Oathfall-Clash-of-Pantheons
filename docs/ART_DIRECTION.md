@@ -26,3 +26,7 @@ Premium hand-painted mythology TCG, antique gold and midnight navy, atmospheric 
 - `assets/ui/app_icon_v2.png`: new phone launcher icon for v0.1.1; bold broken-gold oath ring, sharply defined teal lightning rift, restrained card silhouette on navy, no text. Generated with built-in ImageGen; original icon preserved.
 
 Spells currently reuse related deity/character portraits. Rarity, cost, name, concise on-card summaries, full inspected rules, and current combat statistics remain live UI layers.
+
+## Expansion pantheons (Roman, Egyptian, Japanese, Chinese)
+
+Portraits for the four added pantheons were generated with the local Codex CLI imagegen tool (ChatGPT subscription, no API key), using one shared prefix: premium hand-painted mythology trading-card illustration, dramatic hyper-detailed digital painting, antique gold and midnight navy accents, cinematic lighting, crisp silhouette at small card size, vertical 2:3 portrait, centered subject, no border, frame, text, or watermark. Each pantheon has 8 unit portraits (`assets/cards/art/<id>.png`, 1024×1536); its 4 spells reuse a related unit portrait, as the original pantheons do. Japanese art draws on Shinto and folklore only; Chinese art on folk and mythic figures, avoiding political or sacred-worship imagery.

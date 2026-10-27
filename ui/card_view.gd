@@ -91,7 +91,8 @@ func build() -> void:
  name_label.add_theme_font_size_override("font_size",fitted_size)
  text_at(data.category.to_upper(),Rect2(.21,.600,.58,.06),int(8*factor),Color("e2c78b"))
  var short_rules: String = data.text
- if data.get("guard",false): short_rules = "GUARD\nProtects your allies."
+ if data.has("short"): short_rules = data.short
+ elif data.get("guard",false): short_rules = "GUARD\nProtects your allies."
  elif data.get("rush",false): short_rules = "RUSH\nAttacks units now."
  elif data.has("arrival_damage"): short_rules = "ARRIVAL\n2 damage to all enemy units."
  elif data.has("heal"): short_rules = "ARRIVAL\nRestore 3 Sanctum health."
@@ -124,6 +125,7 @@ func build() -> void:
    add_child(spell_icon)
  if mode == "board":
   var status := "READY" if data.get("ready",false) else ("RESTING" if data.get("fresh",false) else "EXHAUSTED")
+  if data.get("ward",false): status = "WARD · " + status
   if data.get("guard",false): status = "GUARD · " + status
   var tag := text_at(status,Rect2(.04,.948,.92,.06),int(8*factor),Color("81e0d0") if data.get("ready",false) else Color("e3cba0"))
   tag.add_theme_color_override("font_shadow_color",Color.BLACK)
