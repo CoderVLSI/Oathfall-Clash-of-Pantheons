@@ -414,11 +414,15 @@ func show_factions(mode: String = "duel") -> void:
   frame(content,Rect2(x,y,372,350))
   image(content,"res://assets/cards/art/%s.png" % info.art,Rect2(x+10,y+12,160,240))
   label(content,info.title,Rect2(x+180,y+14,185,90),20,GOLD,DISPLAY).autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
-  var desc := label(content,info.text,Rect2(x+14,y+262,345,70),15,CREAM)
+  var desc := label(content,str(info.text).split("\n")[0],Rect2(x+14,y+258,345,24),15,CREAM)
   desc.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
   var power_info: Dictionary = DB.hero_power(faction)
   label(content,"HERO POWER · %d" % power_info.cost,Rect2(x+180,y+178,185,20),12,TEAL,BOLD)
   label(content,power_info.name,Rect2(x+180,y+196,185,24),16,GOLD,BOLD)
+  var oath_info: Dictionary = DB.oath(faction)
+  label(content,"OATH · " + oath_info.name,Rect2(x+14,y+282,345,22),14,Color("f0d49b"),BOLD)
+  var oath_text := label(content,oath_info.text,Rect2(x+14,y+304,345,40),12,Color("b7c3cc"))
+  oath_text.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
   var power_text := label(content,power_info.text,Rect2(x+180,y+220,185,40),13,Color("b7c3cc"))
   power_text.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
   var label_text := "PLAY " + faction.to_upper() if mode == "duel" else "CAMPAIGN  %d / %d" % [profile.stage_cleared(faction),profile.STAGES]
@@ -450,9 +454,20 @@ func close_modal() -> void:
 
 func show_rules() -> void:
  var body := open_modal("THE RULES OF OATHFALL",1060,760)
- var text := "WIN THE DUEL\nReduce the opposing Sanctum from 25 health to zero. Both starter decks contain 24 cards.\n\nYOUR TURN\nGain one maximum Power (up to 10), refill it, ready your units, and draw one card.\nTap a card in your hand, then SUMMON / CAST in the left panel. Damage spells need a target.\n\nCOMBAT\nTap a ready friendly unit, then an enemy unit or the enemy Sanctum. Both units deal damage\nsimultaneously. Every unit attacks once per turn. New units rest until your next turn.\n\nKEYWORDS\nGUARD — Defeat enemy Guards before attacking other units or the Sanctum.\nRUSH — A newly summoned unit may attack units immediately, but not the Sanctum.\nARRIVAL — An effect happens once when the unit enters the battlefield.\nHERO POWER — Each pantheon has an ability usable once per turn for its Power cost. Press the HERO POWER button, then pick a target if asked.\nWARD — The first damage the unit would take is prevented.\nLIFESTEAL — Damage the unit deals restores your Sanctum.\nDEATHRATTLE — An effect happens when the unit dies.\nDamage spells ignore Guard. Healing never exceeds 25 health. Your board holds 5 units.\n\nOPENING HAND\nBefore your first turn you may swap any of your opening cards once. Swapped cards are replaced from your deck first, then shuffled back in.\n\nRUNNING OUT OF CARDS\nAn empty deck deals increasing fatigue damage each draw. Full hands (9 cards) burn new draws.\n\nCONTROLS\nClick or tap cards to inspect and select them. Use the left panel to confirm a play.\nCancel a selection with Escape or CANCEL. End Turn gives control to the AI.\nThe match menu pauses AI actions. Concede ends the match; rematch starts a fresh duel."
- var node := label(body,text,Rect2(38,93,980,630),20,CREAM)
+ var text := "WIN THE DUEL\nReduce the opposing Sanctum from 25 health to zero, or fulfil your pantheon's Oath. Both starter decks contain 24 cards.\n\nYOUR TURN\nGain one maximum Power (up to 10), refill it, ready your units, and draw one card.\nTap a card in your hand, then SUMMON / CAST in the left panel. Damage spells need a target.\n\nCOMBAT\nTap a ready friendly unit, then an enemy unit or the enemy Sanctum. Both units deal damage\nsimultaneously. Every unit attacks once per turn. New units rest until your next turn.\n\nKEYWORDS\nGUARD — Defeat enemy Guards before attacking other units or the Sanctum.\nRUSH — A newly summoned unit may attack units immediately, but not the Sanctum.\nARRIVAL — An effect happens once when the unit enters the battlefield.\nHERO POWER — Each pantheon has an ability usable once per turn for its Power cost. Press the HERO POWER button, then pick a target if asked.\nOATH — A second way to win. Each pantheon swears its own Oath (shown on the right for both sides). Complete yours and you win at once. Board Oaths are checked at the start of your turn, so the rival can break them.\nOMENS — Every third round an omen shapes both players. It is announced one round ahead and lasts one round.\nWARD — The first damage the unit would take is prevented.\nLIFESTEAL — Damage the unit deals restores your Sanctum.\nDEATHRATTLE — An effect happens when the unit dies.\nDamage spells ignore Guard. Healing never exceeds 25 health. Your board holds 5 units.\n\nOPENING HAND\nBefore your first turn you may swap any of your opening cards once. Swapped cards are replaced from your deck first, then shuffled back in.\n\nRUNNING OUT OF CARDS\nAn empty deck deals increasing fatigue damage each draw. Full hands (9 cards) burn new draws.\n\nCONTROLS\nClick or tap cards to inspect and select them. Use the left panel to confirm a play.\nCancel a selection with Escape or CANCEL. End Turn gives control to the AI.\nThe match menu pauses AI actions. Concede ends the match; rematch starts a fresh duel."
+ var scroll := ScrollContainer.new()
+ scroll.position = Vector2(38,88)
+ scroll.size = Vector2(980,640)
+ scroll.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
+ body.add_child(scroll)
+ var node := Label.new()
+ node.text = text
+ node.custom_minimum_size = Vector2(950,0)
  node.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+ node.add_theme_font_override("font",BODY)
+ node.add_theme_font_size_override("font_size",17)
+ node.add_theme_color_override("font_color",CREAM)
+ scroll.add_child(node)
 
 func show_collection() -> void:
  var body := open_modal("THE FIRST AGE · COLLECTION",1430,810)
@@ -625,18 +640,21 @@ func render_battle() -> void:
  button(content,"CANCEL",Rect2(1366,394,193,40),cancel_selection).disabled = busy
  var hero: Dictionary = game.hero_power_of(0)
  var hero_ready: bool = game.current == 0 and not busy and ((game.can_use_power(0)) if hero.target == "none" else (not game.power_targets(0).is_empty()))
- var hero_button := button(content,"%s · %d" % [hero.name.to_upper(),hero.cost],Rect2(1366,444,193,56),hero_power_pressed)
+ var hero_button := button(content,"%s · %d" % [hero.name.to_upper(),game.power_cost(0)],Rect2(1366,444,193,56),hero_power_pressed)
  hero_button.disabled = not hero_ready and not power_mode
  hero_button.tooltip_text = hero.text
  hero_button.add_theme_font_size_override("font_size",15)
  if power_mode: hero_button.add_theme_color_override("font_color",TEAL)
- label(content,"BATTLE CHRONICLE",Rect2(1368,508,205,26),14,GOLD,BOLD)
- for i in range(mini(game.history.size(),5)):
-  var entry := label(content,game.history[i],Rect2(1368,536+i*47,191,45),14,Color("bac4cc") if i==0 else Color("8394a3"))
+ label(content,"BATTLE CHRONICLE",Rect2(1368,506,205,24),13,GOLD,BOLD)
+ for i in range(mini(game.history.size(),2)):
+  var entry := label(content,game.history[i],Rect2(1368,530+i*44,191,42),13,Color("bac4cc") if i==0 else Color("8394a3"))
   entry.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
  ornate_bar(content,Rect2(273,391,1035,32),true,Color("070f1af0"))
  var hint := label(content,notice,Rect2(289,393,1000,27),16,TEAL if attacker>=0 or selection>=0 else CREAM)
  hint.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+ draw_oath_box(0,636.0)
+ draw_oath_box(1,760.0)
+ draw_omen_plaque()
  play_fx()
 
 func render_inspector() -> void:
@@ -806,7 +824,8 @@ func show_result() -> void:
  clear_screen()
  image(content,"res://assets/backgrounds/menu.png",Rect2(0,0,1600,900),Color(.38,.42,.48))
  frame(content,Rect2(400,135,800,640),true)
- label(content,"THE OATH IS FULFILLED" if game.winner==0 else "THE REALMS REMEMBER",Rect2(510,185,670,40),18,TEAL,BOLD)
+ var caption := label(content,result_caption(),Rect2(430,185,740,40),18,TEAL,BOLD)
+ caption.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
  var title := "VICTORY" if game.winner==0 else ("DRAW" if game.winner==2 else "DEFEAT")
  var headline := label(content,title,Rect2(430,243,740,100),69,GOLD,DISPLAY)
  headline.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
@@ -1057,8 +1076,21 @@ func play_fx() -> void:
    "spell":
     flash_screen(Color("fce4a3") if event.extra != "heal" else Color("7be3a2"))
     sound("summon")
+   "omen":
+    turn_banner("OMEN · %s" % DB.OMENS[event.extra].name.to_upper(),Color("f4cc79"),delay)
+    delay += 1.3
+    sound("turn")
+   "omen_warning":
+    turn_banner("OMEN LOOMS · %s" % DB.OMENS[event.extra].name.to_upper(),Color("a9bccb"),delay)
+    delay += 1.3
+   "oath":
+    turn_banner("OATH FULFILLED",Color("f4cc79"),delay)
+    flash_screen(Color("f4cc79"))
+    sound("win")
    "turn":
-    if game.turn > 1: turn_banner("YOUR TURN" if event.side == 0 else "RIVAL'S TURN",TEAL if event.side == 0 else Color("edaf8d"))
+    if game.turn > 1:
+     turn_banner("YOUR TURN" if event.side == 0 else "RIVAL'S TURN",TEAL if event.side == 0 else Color("edaf8d"),delay)
+     delay += 1.3
    "power":
     var power_pos: Vector2 = fx_position(event)
     float_text(game.hero_power_of(event.side).name,power_pos + Vector2(0,-40),Color("f4cc79"),24)
@@ -1152,7 +1184,7 @@ func shake_screen(strength: float) -> void:
   tween.tween_property(target,"position",Vector2(randf_range(-1,1),randf_range(-1,1)) * strength * falloff,.03)
  tween.tween_property(target,"position",Vector2.ZERO,.03)
 
-func turn_banner(text: String, color: Color) -> void:
+func turn_banner(text: String, color: Color, delay: float = 0.0) -> void:
  var band := ColorRect.new()
  band.color = Color(.03,.07,.11,.82)
  band.position = Vector2(-1600,390)
@@ -1162,6 +1194,7 @@ func turn_banner(text: String, color: Color) -> void:
  var title := label(band,text,Rect2(0,18,1600,74),58,color,DISPLAY)
  title.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
  var tween := create_tween()
+ tween.tween_interval(delay)
  tween.tween_property(band,"position:x",0.0,.28).set_trans(Tween.TRANS_CUBIC).set_ease(Tween.EASE_OUT)
  tween.tween_interval(.55)
  tween.tween_property(band,"position:x",1600.0,.28).set_trans(Tween.TRANS_CUBIC).set_ease(Tween.EASE_IN)
@@ -1213,6 +1246,51 @@ func confirm_mulligan(swap: bool) -> void:
  if not game.sides[0].hand.is_empty(): inspected_data = DB.card(game.sides[0].hand[0])
  notice = game.history[0] if swap and game.history.size() > 0 else "Your oath begins. Select a card from your hand."
  render_battle()
+
+func result_caption() -> String:
+ var oath_name: String = DB.oath(game.sides[game.winner].faction).name if game.winner >= 0 and game.winner < 2 else ""
+ match game.win_reason:
+  "oath":
+   return ("OATH FULFILLED · %s" % oath_name).to_upper() if game.winner == 0 else ("THE RIVAL FULFILLED THEIR OATH · %s" % oath_name).to_upper()
+  "concede":
+   return "YOU CONCEDED THE DUEL" if game.winner != 0 else "THE RIVAL CONCEDED"
+  "sanctum":
+   if game.winner == 2: return "BOTH SANCTUMS FALL"
+   return "THE RIVAL'S SANCTUM FALLS" if game.winner == 0 else "YOUR SANCTUM FALLS"
+ return "THE OATH IS FULFILLED" if game.winner == 0 else "THE REALMS REMEMBER"
+
+# Progress tracker for a side's Oath, the second path to victory.
+func draw_oath_box(side: int, y: float) -> void:
+ var oath: Dictionary = DB.oath(game.sides[side].faction)
+ var progress: int = game.oath_progress(side)
+ var goal: int = oath.goal
+ var mine := side == 0
+ ornate_bar(content,Rect2(1362,y,201,116),false,Color("0a1626f2"))
+ label(content,"YOUR OATH" if mine else "RIVAL'S OATH",Rect2(1374,y+6,180,18),11,TEAL if mine else Color("edaf8d"),BOLD)
+ var oath_name := label(content,oath.name,Rect2(1374,y+21,182,24),15,GOLD,BOLD)
+ oath_name.clip_text = true
+ panel(content,Rect2(1374,y+50,126,10),Color("1b2733"),Color("4c4430"),4)
+ var ratio := clampf(float(progress) / float(goal),0.0,1.0)
+ if ratio > 0.0: panel(content,Rect2(1374,y+50,maxf(126.0 * ratio,6.0),10),Color("72d6cc") if mine else Color("e59b7c"),Color.TRANSPARENT,4)
+ label(content,"%d / %d" % [mini(progress,goal),goal],Rect2(1506,y+45,52,20),14,CREAM,BOLD)
+ var text := label(content,oath.text if mine else str(oath.text).replace("your","their"),Rect2(1374,y+67,184,46),11,Color("b6c2cc"))
+ text.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+
+func draw_omen_plaque() -> void:
+ var text := ""
+ var color := Color("f4cc79")
+ if game.omen != "":
+  var info: Dictionary = DB.OMENS[game.omen]
+  text = "OMEN · %s — %s" % [info.name.to_upper(),info.text]
+ elif game.pending_omen != "":
+  var coming: Dictionary = DB.OMENS[game.pending_omen]
+  text = "OMEN LOOMS · %s NEXT ROUND — %s" % [coming.name.to_upper(),coming.text]
+  color = Color("a9bccb")
+ if text == "": return
+ ornate_bar(content,Rect2(500,148,600,22),true,Color("0a1626f2"))
+ var line := label(content,text,Rect2(500,148,600,22),12,color,BOLD)
+ line.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+ line.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
 
 func _unhandled_key_input(event: InputEvent) -> void:
  if event.is_action_pressed("ui_cancel"):

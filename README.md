@@ -6,7 +6,8 @@ A fully 2D, offline mythology card battler built with Godot 4.7.1. Play any of s
 
 Open `project.godot` in Godot 4.7.1 and press F6 with `main.tscn` open, or F5 to run the project. Choose **Enter the Arena**, then a pantheon.
 
-- Both Sanctums start with 25 health; reduce your rival's to zero to win.
+- Both Sanctums start with 25 health; reduce your rival's to zero to win, **or fulfil your pantheon's Oath**: Ascension of Olympus (3 Gods), Ragnarök (15 total Attack), Legion Unbroken (4 Mortals), Weighing of the Heart (15 fallen units), Night Parade (7 spells), Harmony of Heaven (God + Beast + Mortal among 5 units) and Rite of the Fifth Sun (14 health restored). Both Oaths are shown on screen; board Oaths are checked at the start of your turn, so the rival can break them.
+- Every third round an **Omen** (Eclipse, Tempest, Tide of Plenty, Divine Favor, Stillness) shapes both players; it is announced one round ahead.
 - Each turn increases and refills Power (maximum 10), draws a card, and readies your units.
 - Click/tap a hand card, then confirm **Summon** or **Cast** in the inspector. Damage spells are cast by selecting an enemy unit or Sanctum.
 - Click/tap a ready friendly unit, then an enemy. New units rest for one turn. Guard units protect other targets. Rush can attack units immediately.

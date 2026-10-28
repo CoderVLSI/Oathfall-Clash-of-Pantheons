@@ -46,10 +46,16 @@ func capture() -> void:
  app.game.sides[0].hand=["ashigaru","oni","tengu","amaterasu","kusanagi","sake"]
  app.inspected_data=load("res://scripts/card_database.gd").card("oni")
  app.selection=1
+ app.game.omen = "tempest"
+ app.game.omen_turns = 2
+ app.game.sides[0].board.append({"uid":901,"name":"God","category":"God","attack":3,"hp":4,"health":4,"ready":true,"fresh":false,"cost":4,"rarity":"Legendary","faction":"Japanese","text":"t","art":"amaterasu"})
  app.render_battle()
  await snap("res://qa/battle_board.png")
  app.show_pause()
  await snap("res://qa/pause.png")
+ app.close_modal()
+ app.show_rules()
+ await snap("res://qa/rules.png")
  app.close_modal()
  app.selection=4
  app.game.sides[1].hp=3

@@ -316,7 +316,138 @@ func _initialize() -> void:
  for id in m.sides[1].hand: if DB.CARDS[id].cost>=5: costly+=1
  expect(swapped==2 and costly==1 and m.sides[1].hand.size()==5,"AI swaps at most two expensive cards")
  expect(m.winner==-1 and m.turn==1,"Mulligan does not advance the match")
- # Every card definition is well formed and every deck is legal.
+ # Oaths: a second path to victory, one per pantheon.
+ for faction in DB.FACTIONS:
+  var oath: Dictionary=DB.oath(faction)
+  expect(oath.goal>=3 and ["turn","total"].has(oath.timing) and oath.text!="","%s oath is well formed" % faction)
+ m=power_fixture("Greek")
+ m.sides[0].board=[{"uid":1,"category":"God","hp":3,"attack":1},{"uid":2,"category":"God","hp":3,"attack":1}]
+ expect(m.oath_progress(0)==2,"Oath progress counts matching units")
+ m.end_turn(0)
+ m.end_turn(1)
+ expect(m.winner==-1,"Two Gods are not enough for the Greek oath")
+ m.sides[0].board.append({"uid":3,"category":"God","hp":3,"attack":1})
+ m.end_turn(0)
+ expect(m.winner==-1,"Board oaths are checked only at the start of the owner's turn")
+ m.end_turn(1)
+ expect(m.winner==0 and m.win_reason=="oath","Greek oath: three Gods at the start of your turn wins")
+ m=power_fixture("Greek")
+ m.sides[0].board=[{"uid":1,"category":"God","hp":3,"attack":1},{"uid":2,"category":"God","hp":3,"attack":1},{"uid":3,"category":"God","hp":3,"attack":1}]
+ m.end_turn(0)
+ m.sides[0].board.remove_at(0)
+ m.end_turn(1)
+ expect(m.winner==-1,"The rival can break a board oath during their turn")
+ m=power_fixture("Norse")
+ m.sides[0].board=[{"uid":1,"attack":8,"hp":3},{"uid":2,"attack":6,"hp":3},{"uid":3,"attack":4,"hp":3}]
+ m.end_turn(0)
+ m.end_turn(1)
+ expect(m.winner==0 and m.win_reason=="oath","Norse oath: 18 total Attack wins")
+ m=power_fixture("Roman")
+ var roman_goal: int=DB.oath("Roman").goal
+ for i in range(roman_goal-1): m.sides[0].board.append({"uid":i+1,"category":"Mortal","hp":2,"attack":1})
+ m.sides[0].board.append({"uid":9,"category":"Beast","hp":2,"attack":1})
+ m.end_turn(0)
+ m.end_turn(1)
+ expect(m.winner==-1,"Roman oath needs the full number of Mortals")
+ m.sides[0].board[roman_goal-1].category="Mortal"
+ m.end_turn(0)
+ m.end_turn(1)
+ expect(m.winner==0 and m.win_reason=="oath","Roman oath: enough Mortals wins")
+ m=power_fixture("Chinese")
+ m.sides[0].board=[{"uid":1,"category":"God","hp":3,"attack":1},{"uid":2,"category":"God","hp":3,"attack":1},{"uid":3,"category":"Beast","hp":3,"attack":1}]
+ expect(m.oath_progress(0)==0,"Chinese oath shows no progress until enough units are present")
+ m.sides[0].board.append({"uid":4,"category":"Mortal","hp":3,"attack":1})
+ expect(m.oath_progress(0)==0,"Chinese oath also needs enough units on the board")
+ for i in range(DB.oath("Chinese").min_units-4): m.sides[0].board.append({"uid":10+i,"category":"Mortal","hp":3,"attack":1})
+ expect(m.oath_progress(0)==3,"Chinese oath counts three categories once enough units are present")
+ m.end_turn(0)
+ m.end_turn(1)
+ expect(m.winner==0 and m.win_reason=="oath","Chinese oath: God, Beast and Mortal wins")
+ m=power_fixture("Egyptian")
+ var egypt_goal: int=DB.oath("Egyptian").goal
+ for i in range(egypt_goal-1):
+  m.sides[0].board.append({"uid":i+1,"hp":0,"attack":1})
+  m.cleanup()
+ expect(m.winner==-1 and m.sides[0].deaths==egypt_goal-1,"Egyptian oath counts fallen units")
+ m.sides[0].board.append({"uid":999,"hp":0,"attack":1})
+ m.cleanup()
+ expect(m.winner==0 and m.win_reason=="oath","Egyptian oath: enough fallen units wins immediately")
+ m=power_fixture("Japanese")
+ m.sides[0].power=50
+ var spell_goal: int=DB.oath("Japanese").goal
+ for i in range(spell_goal-1):
+  m.sides[0].hand=["omikuji"]
+  m.play_card(0,0)
+ expect(m.winner==-1 and m.sides[0].spells_cast==spell_goal-1,"Japanese oath counts spells cast")
+ m.sides[0].hand=["omikuji"]
+ m.play_card(0,0)
+ expect(m.winner==0 and m.win_reason=="oath","Japanese oath: enough spells wins")
+ m=power_fixture("Aztec")
+ m.sides[0].hp=1
+ m.heal_sanctum(0,10)
+ expect(m.sides[0].healed==10 and m.sides[0].hp==11,"Aztec oath counts health restored")
+ m.heal_sanctum(0,10)
+ m.check_winner()
+ expect(m.winner==0 and m.win_reason=="oath","Aztec oath: enough health restored wins")
+ m=power_fixture("Aztec")
+ m.heal_sanctum(0,5)
+ expect(m.sides[0].healed==0,"Healing at full health does not count toward the oath")
+ m=power_fixture("Greek")
+ m.sides[1].hp=0
+ m.check_winner()
+ expect(m.winner==0 and m.win_reason=="sanctum","A broken Sanctum is reported as a Sanctum win")
+ m=power_fixture("Greek")
+ m.concede(0)
+ expect(m.win_reason=="concede","Conceding is reported as such")
+ # Omens: announced a round ahead, active for one round, then gone.
+ m=power_fixture("Greek")
+ for i in range(2): m.sides[i].deck=DB.deck("Greek")+DB.deck("Greek")
+ var seen_pending := false
+ var seen_active := false
+ for turn_index in range(12):
+  m.end_turn(m.current)
+  if m.pending_omen!="": seen_pending=true
+  if m.omen!="": seen_active=true
+  if m.turn==3: expect(m.pending_omen!="" and m.omen=="","Round 2 announces an omen")
+  if m.turn==5: expect(m.omen!="" and m.omen_turns==2 and m.pending_omen=="","Round 3 activates the announced omen")
+  if m.turn==6: expect(m.omen!="" and m.omen_turns==1,"The omen lasts through the rival's turn")
+  if m.turn==7: expect(m.omen=="","The omen ends before round 4")
+ expect(seen_pending and seen_active,"Omens are announced and then become active")
+ m=power_fixture("Greek")
+ m.omen="eclipse"
+ m.sides[0].hp=10
+ m.heal_sanctum(0,5)
+ expect(m.sides[0].hp==10,"Eclipse blocks healing")
+ m=power_fixture("Greek")
+ m.omen="tempest"
+ m.sides[0].board=[{"uid":1,"name":"A","attack":2,"hp":5,"ready":true,"fresh":false}]
+ m.attack(0,1,-1)
+ expect(m.sides[1].hp==22,"Tempest adds 1 Attack to attacks")
+ m=power_fixture("Greek")
+ m.omen="stillness"
+ m.sides[0].hand=["bolt"]
+ var power_before: int=m.sides[0].power
+ m.play_card(0,0,-1)
+ expect(m.sides[0].power==power_before-1,"Stillness makes spells cost 1 less")
+ m=power_fixture("Greek")
+ m.omen="favor"
+ expect(m.power_cost(0)==2,"Divine Favor reduces hero power cost")
+ m.sides[0].board=[{"uid":1,"name":"A","attack":2,"hp":5}]
+ power_before=m.sides[0].power
+ m.use_power(0,1)
+ expect(m.sides[0].power==power_before-2,"Divine Favor discount is charged")
+ m=power_fixture("Greek")
+ m.sides[1].deck=["hoplite","hoplite","hoplite","hoplite"]
+ m.omen="plenty"
+ m.omen_turns=5
+ var hand_before_omen: int=m.sides[1].hand.size()
+ m.end_turn(0)
+ expect(m.sides[1].hand.size()==hand_before_omen+2,"Tide of Plenty draws an extra card") # Every card has its own illustration: no two cards may share a portrait.
+ var art_owner := {}
+ for id in DB.CARDS:
+  var art_id: String=DB.card(id).art
+  expect(not art_owner.has(art_id),"Card %s shares artwork '%s' with %s" % [id,art_id,art_owner.get(art_id,"")])
+  art_owner[art_id]=id # Every card definition is well formed and every deck is legal.
  for id in DB.CARDS:
   var c=DB.card(id)
   expect(c.cost>=0 and c.cost<=10 and c.has("text") and c.has("rarity"),"Card %s has core fields" % id)
@@ -333,11 +464,12 @@ func _initialize() -> void:
   expect(distinct.size()>=12 and distinct.size()<=13,"%s has 12-13 distinct cards" % faction)
   expect(ResourceLoader.exists("res://assets/cards/frames/frame_%s.png" % faction.to_lower()),"%s has a themed card frame" % faction)
   expect(ResourceLoader.exists("res://assets/backgrounds/bg_%s.jpg" % faction.to_lower()),"%s has a battle background" % faction)
-  for id in distinct: expect(ResourceLoader.exists("res://assets/cards/art/%s.png" % DB.CARDS[id].art),"%s art exists for %s" % [faction,id])
+  for id in distinct: expect(ResourceLoader.exists("res://assets/cards/art/%s.png" % DB.card(id).art),"%s art exists for %s" % [faction,id])
   expect(ids.size()==24,"%s deck has 24 cards" % faction)
   for id in ids: expect(DB.CARDS[id].faction==faction,"%s deck contains only its own cards" % faction)
  # Simulate both starter decks through full games, using the same AI on each side.
  var results := [0,0,0]
+ var oath_wins := 0
  for seed_index in range(60):
   m=MATCH.new()
   m.start(DB.FACTIONS[seed_index%DB.FACTIONS.size()],seed_index+1)
@@ -368,6 +500,7 @@ func _initialize() -> void:
    if m.turn>100: break
   expect(m.winner!=-1,"Every seeded game terminates")
   if m.winner>=0: results[m.winner]+=1
+  if m.win_reason=="oath": oath_wins+=1
  # Difficulty ordering: a harder AI should beat an easier one over many mirrored matches.
  var hard_wins := 0
  var easy_wins := 0
@@ -387,7 +520,7 @@ func _initialize() -> void:
   if duel(3000+i,f2,[1,0])==0: normal_vs_easy+=1
   if duel(4000+i,f2,[0,1])==1: normal_vs_easy+=1
  expect(normal_vs_easy>=26,"Normal AI beats Easy AI most of the time")
- print("RULES: %d checks, %d failures; 60 completed simulations, results %s" % [checks,failures,str(results)])
+ print("RULES: %d checks, %d failures; 60 completed simulations, results %s, oath wins %d" % [checks,failures,str(results),oath_wins])
  quit(0 if failures==0 else 1)
 
 # Plays a full match with the given AI level for each seat; returns the winner (0, 1, or 2 for a draw).

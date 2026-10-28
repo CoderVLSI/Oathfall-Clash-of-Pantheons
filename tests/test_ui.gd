@@ -171,6 +171,35 @@ func run() -> void:
  verify(app.game.sides[1].mulligan_done,"The rival has already used its mulligan")
  app.show_mulligan()
  verify(not is_instance_valid(app.modal),"Mulligan cannot be repeated")
+ # Oath and omen presentation.
+ app.start_match("Greek")
+ await process_frame
+ app.game.sides[0].board=[{"uid":801,"name":"G","attack":2,"hp":3,"health":3,"ready":true,"fresh":false,"cost":1,"category":"God","rarity":"Common","faction":"Greek","text":"t","art":"zeus"}]
+ app.game.omen="eclipse"
+ app.game.omen_turns=2
+ app.render_battle()
+ await process_frame
+ verify(app.screen=="battle" and app.game.oath_progress(0)==1,"Battle renders with an active omen and oath progress")
+ app.game.omen=""
+ app.game.pending_omen="tempest"
+ app.render_battle()
+ await process_frame
+ verify(app.screen=="battle","Battle renders while an omen looms")
+ app.game.pending_omen=""
+ app.game.winner=0
+ app.game.win_reason="oath"
+ verify(app.result_caption().contains("OATH FULFILLED") and app.result_caption().contains("ASCENSION"),"Oath victory caption names the oath")
+ app.game.winner=1
+ verify(app.result_caption().contains("RIVAL FULFILLED"),"Oath defeat caption names the rival's oath")
+ app.game.win_reason="sanctum"
+ verify(app.result_caption().contains("YOUR SANCTUM"),"Sanctum defeat caption")
+ app.game.winner=0
+ verify(app.result_caption().contains("RIVAL'S SANCTUM"),"Sanctum victory caption")
+ app.game.win_reason="concede"
+ app.game.winner=1
+ verify(app.result_caption().contains("CONCEDED"),"Concede caption")
+ app.game.winner=-1
+ app.game.win_reason=""
  app.generation += 1
  app.queue_free()
  await process_frame

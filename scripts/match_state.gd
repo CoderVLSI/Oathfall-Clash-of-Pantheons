@@ -14,6 +14,10 @@ var rng := RandomNumberGenerator.new()
 var ai_level := 1 # 0 easy, 1 normal, 2 hard
 # Presentation events (damage, heal, death, ...) queued for the UI; call drain_fx() to consume them.
 var fx: Array = []
+var win_reason := ""
+var omen := ""
+var omen_turns := 0
+var pending_omen := ""
 
 func fx_add(type: String, side: int, uid: int = -1, amount: int = 0, extra: String = "") -> void:
  fx.append({"type":type,"side":side,"uid":uid,"amount":amount,"extra":extra})
@@ -30,9 +34,13 @@ func damage_sanctum(side: int, amount: int) -> void:
  fx_add("damage",side,-1,amount)
 
 func heal_sanctum(side: int, amount: int) -> void:
+ if omen == "eclipse": return
  var before: int = sides[side].hp
  sides[side].hp = mini(MAX_HP,before + amount)
- if sides[side].hp > before: fx_add("heal",side,-1,sides[side].hp - before)
+ var gained: int = sides[side].hp - before
+ if gained > 0:
+  sides[side].healed = sides[side].get("healed",0) + gained
+  fx_add("heal",side,-1,gained)
 
 func start(faction: String = "Greek", seed_value: int = 0, rival: String = "", player_deck: Array = []) -> void:
  if seed_value == 0: rng.randomize()
@@ -44,6 +52,10 @@ func start(faction: String = "Greek", seed_value: int = 0, rival: String = "", p
  winner = -1
  next_uid = 1
  fx.clear()
+ win_reason = ""
+ omen = ""
+ omen_turns = 0
+ pending_omen = ""
  if rival == "" or rival == faction:
   var others: Array = DB.FACTIONS.filter(func(f): return f != faction)
   rival = others[rng.randi_range(0,others.size()-1)]
@@ -55,7 +67,7 @@ func start(faction: String = "Greek", seed_value: int = 0, rival: String = "", p
    var temp = deck[i]
    deck[i] = deck[j]
    deck[j] = temp
-  sides.append({"faction":f,"hp":MAX_HP,"power":0,"max_power":0,"deck":deck,"hand":[],"board":[],"fatigue":0,"power_used":false,"mulligan_done":false})
+  sides.append({"faction":f,"hp":MAX_HP,"power":0,"max_power":0,"deck":deck,"hand":[],"board":[],"fatigue":0,"power_used":false,"mulligan_done":false,"deaths":0,"spells_cast":0,"healed":0})
  for p in range(2):
   for i in range(4): draw_card(p)
  begin_turn(0)
@@ -82,6 +94,7 @@ func begin_turn(p: int) -> void:
  if winner != -1: return
  current = p
  turn += 1
+ update_omen(p)
  var s: Dictionary = sides[p]
  s.max_power = mini(s.max_power + 1, 10)
  s.power = s.max_power
@@ -91,7 +104,10 @@ func begin_turn(p: int) -> void:
   unit.fresh = false
  log_event("%s turn · %d Power." % [s.faction, s.power])
  fx_add("turn",p)
+ check_oath(p,"turn")
+ if winner != -1: return
  draw_card(p)
+ if omen == "plenty": draw_card(p)
 
 func end_turn(p: int) -> bool:
  if winner != -1 or p != current: return false
@@ -116,7 +132,13 @@ func guards(p: int) -> Array:
 func can_play(p: int, index: int) -> bool:
  if winner != -1 or current != p or index < 0 or index >= sides[p].hand.size(): return false
  var c := DB.card(sides[p].hand[index])
- return c.cost <= sides[p].power and (c.category == "Spell" or sides[p].board.size() < MAX_BOARD)
+ return card_cost(c) <= sides[p].power and (c.category == "Spell" or sides[p].board.size() < MAX_BOARD)
+
+func card_cost(c: Dictionary) -> int:
+ return maxi(0,c.cost - (1 if omen == "stillness" and c.category == "Spell" else 0))
+
+func eff_attack(unit: Dictionary) -> int:
+ return unit.get("attack",0) + (1 if omen == "tempest" else 0)
 
 # target_uid -1 denotes the opposing Sanctum. Damage spells bypass Guard.
 func play_card(p: int, index: int, target_uid: int = -1) -> bool:
@@ -125,10 +147,11 @@ func play_card(p: int, index: int, target_uid: int = -1) -> bool:
  var c := DB.card(s.hand[index])
  var enemy: Dictionary = sides[1-p]
  if c.get("effect", "") == "damage" and target_uid != -1 and unit_by_uid(1-p,target_uid).is_empty(): return false
- s.power -= c.cost
+ s.power -= card_cost(c)
  s.hand.remove_at(index)
  if c.category == "Spell":
   fx_add("spell",p,target_uid,0,c.effect)
+  s.spells_cast = s.get("spells_cast",0) + 1
   match c.effect:
    "heal": heal_sanctum(p,c.amount)
    "damage":
@@ -173,13 +196,13 @@ func attack(p: int, uid: int, target_uid: int) -> bool:
  attacker.ready = false
  fx_add("attack",p,uid,0,str(target_uid))
  if target_uid == -1:
-  damage_sanctum(1-p,attacker.attack)
-  lifesteal(p,attacker,attacker.attack)
-  log_event("%s struck the Sanctum for %d." % [attacker.name,attacker.attack])
+  damage_sanctum(1-p,eff_attack(attacker))
+  lifesteal(p,attacker,eff_attack(attacker))
+  log_event("%s struck the Sanctum for %d." % [attacker.name,eff_attack(attacker)])
  else:
   var defender := unit_by_uid(1-p,target_uid)
-  var dealt := hurt(defender,attacker.attack)
-  var taken := hurt(attacker,defender.attack)
+  var dealt := hurt(defender,eff_attack(attacker))
+  var taken := hurt(attacker,eff_attack(defender))
   lifesteal(p,attacker,dealt)
   lifesteal(1-p,defender,taken)
   log_event("%s fought %s." % [attacker.name,defender.name])
@@ -196,6 +219,7 @@ func cleanup() -> void:
     if board[i].hp <= 0:
      fallen.push_front({"owner":p,"unit":board[i]})
      fx_add("death",p,board[i].uid if board[i].has("uid") else -1)
+     sides[p].deaths = sides[p].get("deaths",0) + 1
      board.remove_at(i)
   if fallen.is_empty(): break
   for entry in fallen: trigger_deathrattle(entry.owner,entry.unit)
@@ -237,13 +261,19 @@ func buff_allies(p: int, attack_bonus: int, health_bonus: int, except_uid: int) 
 
 func check_winner() -> void:
  if sides.size() < 2: return
- if sides[0].hp <= 0 and sides[1].hp <= 0: winner = 2
- elif sides[0].hp <= 0: winner = 1
- elif sides[1].hp <= 0: winner = 0
+ if winner == -1:
+  if sides[0].hp <= 0 and sides[1].hp <= 0: winner = 2
+  elif sides[0].hp <= 0: winner = 1
+  elif sides[1].hp <= 0: winner = 0
+  if winner != -1: win_reason = "sanctum"
+ if winner == -1:
+  check_oath(current,"total")
+  check_oath(1 - current,"total")
 
 func concede(p: int) -> void:
  if winner == -1:
   winner = 1-p
+  win_reason = "concede"
   log_event("%s conceded." % sides[p].faction)
 
 # Returns an action without changing state; UI controls pacing.
@@ -378,7 +408,7 @@ func ai_action_hard() -> Dictionary:
   match c.get("effect",""):
    "heal":
     if s.hp > MAX_HP - 4: continue
-    score = 9.0 if s.hp < 9 else 2.0
+    score = (9.0 if s.hp < 9 else 2.0) + (2.0 if DB.oath(s.faction).kind == "healed" else 0.0)
    "draw":
     if s.hand.size() >= 7: continue
     score = 3.0 + (1.5 if s.hand.size() <= 3 else 0.0)
@@ -404,6 +434,7 @@ func ai_action_hard() -> Dictionary:
     score = 2.0 + best_value
    _:
     score += 2.0
+    score += 1.5 * oath_unit_value(p,c)
     if c.has("arrival_draw") or c.has("deathrattle") or c.get("ward",false): score += 0.5
     if c.get("guard",false) and s.hp < 12: score += 2.0
     if s.board.size() >= MAX_BOARD - 1: score -= 1.0
@@ -430,6 +461,10 @@ func ai_action_hard() -> Dictionary:
     var dies: bool = (0 if unit.get("ward",false) else defender.attack) >= unit.hp
     score = -1.0
     if kills: score += 3.0 + defender.cost + defender.attack * 0.5
+    # Break the rival's Oath: remove units it is counting on, most urgently when it is one step away.
+    var rival_oath := DB.oath(sides[0].faction)
+    var urgency := 1.0 if rival_oath.timing == "turn" and oath_progress(0) >= rival_oath.goal - 1 else 0.35
+    if kills: score += 4.0 * oath_unit_value(0,defender) * urgency
     if dies: score -= 2.0 + unit.cost
     if not kills and not dies: score += 1.0
     if defender.get("guard",false): score += 1.5
@@ -456,7 +491,7 @@ func power_target_ok(effect: String, unit: Dictionary) -> bool:
 func can_use_power(p: int, target_uid: int = -1) -> bool:
  if winner != -1 or current != p or sides[p].power_used: return false
  var power := hero_power_of(p)
- if power.cost > sides[p].power: return false
+ if power_cost(p) > sides[p].power: return false
  match power.target:
   "ally":
    var unit := unit_by_uid(p,target_uid)
@@ -480,7 +515,7 @@ func use_power(p: int, target_uid: int = -1) -> bool:
  if not can_use_power(p,target_uid): return false
  var s: Dictionary = sides[p]
  var power := hero_power_of(p)
- s.power -= power.cost
+ s.power -= power_cost(p)
  s.power_used = true
  fx_add("power",p,target_uid,0,power.effect)
  match power.effect:
@@ -572,3 +607,77 @@ func ai_mulligan() -> int:
  for i in range(sides[1].hand.size()):
   if DB.card(sides[1].hand[i]).cost >= 5 and picks.size() < 2: picks.append(i)
  return mulligan(1,picks)
+
+# --- Oaths ----------------------------------------------------------------------------
+func oath_progress(p: int) -> int:
+ var s: Dictionary = sides[p]
+ var oath := DB.oath(s.faction)
+ var n := 0
+ match oath.kind:
+  "gods":
+   for unit in s.board: if unit.get("category","") == "God": n += 1
+  "attack":
+   for unit in s.board: n += unit.get("attack",0)
+  "mortals":
+   for unit in s.board: if unit.get("category","") == "Mortal": n += 1
+  "categories":
+   var seen := {}
+   for unit in s.board:
+    var category: String = unit.get("category","")
+    if ["God","Beast","Mortal"].has(category): seen[category] = true
+   n = seen.size() if s.board.size() >= oath.get("min_units",0) else 0
+  "deaths": n = s.get("deaths",0)
+  "spells": n = s.get("spells_cast",0)
+  "healed": n = s.get("healed",0)
+ return n
+
+func check_oath(p: int, timing: String) -> void:
+ if winner != -1 or p < 0 or p >= sides.size(): return
+ var oath := DB.oath(sides[p].faction)
+ if oath.timing != timing: return
+ if oath_progress(p) >= oath.goal:
+  winner = p
+  win_reason = "oath"
+  log_event("%s fulfilled the %s!" % [sides[p].faction,oath.name])
+  fx_add("oath",p)
+
+# --- Omens ----------------------------------------------------------------------------
+func round_number() -> int:
+ return ceili(turn / 2.0)
+
+# Called at the start of every turn. Round 2, 5, 8... announces an omen; the following round it applies.
+func update_omen(p: int) -> void:
+ var activated := false
+ if p == 0 and pending_omen != "" and round_number() % 3 == 0:
+  omen = pending_omen
+  omen_turns = 2
+  pending_omen = ""
+  activated = true
+  log_event("Omen: %s — %s" % [DB.OMENS[omen].name,DB.OMENS[omen].text])
+  fx_add("omen",-1,-1,0,omen)
+ if omen != "" and not activated:
+  omen_turns -= 1
+  if omen_turns <= 0:
+   omen = ""
+   fx_add("omen_end",-1)
+ if p == 0 and omen == "" and pending_omen == "" and round_number() % 3 == 2:
+  pending_omen = DB.OMEN_IDS[rng.randi_range(0,DB.OMEN_IDS.size() - 1)]
+  log_event("An omen looms: %s next round." % DB.OMENS[pending_omen].name)
+  fx_add("omen_warning",-1,-1,0,pending_omen)
+
+func power_cost(p: int) -> int:
+ return maxi(0,hero_power_of(p).cost - (1 if omen == "favor" else 0))
+
+# How much a unit (or card) counts toward a side's Oath, 0 to 1; used by the Hard AI.
+func oath_unit_value(p: int, unit: Dictionary) -> float:
+ var oath := DB.oath(sides[p].faction)
+ var category: String = unit.get("category","")
+ match oath.kind:
+  "gods": return 1.0 if category == "God" else 0.0
+  "mortals": return 1.0 if category == "Mortal" else 0.0
+  "attack": return clampf(float(unit.get("attack",0)) / 6.0,0.0,1.0)
+  "categories":
+   var have := {}
+   for u in sides[p].board: have[u.get("category","")] = true
+   return 1.0 if ["God","Beast","Mortal"].has(category) and not have.has(category) else 0.0
+ return 0.0

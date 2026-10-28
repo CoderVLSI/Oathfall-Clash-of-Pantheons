@@ -95,6 +95,30 @@ const CARDS = {
 
 const FACTIONS = ["Greek","Norse","Roman","Egyptian","Japanese","Chinese","Aztec"]
 
+# Oath: a second way to win. "turn" oaths are checked at the start of the owner's turn
+# (the rival gets a full turn to break them); "total" oaths the moment the counter hits the goal.
+const OATHS = {
+ "Greek": {"name":"Ascension of Olympus","kind":"gods","goal":3,"timing":"turn","text":"Control 3 Gods at the start of your turn."},
+ "Norse": {"name":"Ragnarök","kind":"attack","goal":15,"timing":"turn","text":"Control units with 15 total Attack at the start of your turn."},
+ "Roman": {"name":"Legion Unbroken","kind":"mortals","goal":4,"timing":"turn","text":"Control 4 Mortals at the start of your turn."},
+ "Egyptian": {"name":"Weighing of the Heart","kind":"deaths","goal":15,"timing":"total","text":"Have 15 of your units fall in battle."},
+ "Japanese": {"name":"Night Parade","kind":"spells","goal":7,"timing":"total","text":"Cast 7 spells."},
+ "Chinese": {"name":"Harmony of Heaven","kind":"categories","goal":3,"min_units":5,"timing":"turn","text":"Control a God, a Beast and a Mortal among 5 units at the start of your turn."},
+ "Aztec": {"name":"Rite of the Fifth Sun","kind":"healed","goal":14,"timing":"total","text":"Restore 14 health in total."}
+}
+
+static func oath(faction: String) -> Dictionary:
+ return OATHS.get(faction,OATHS["Greek"])
+
+# Omens: announced one round ahead, then shape both players' next round.
+const OMENS = {
+ "eclipse": {"name":"Eclipse","text":"Healing is blocked."},
+ "tempest": {"name":"Tempest","text":"All units have +1 Attack."},
+ "plenty": {"name":"Tide of Plenty","text":"Each player draws an extra card at turn start."},
+ "favor": {"name":"Divine Favor","text":"Hero powers cost 1 less."},
+ "stillness": {"name":"Stillness","text":"Spells cost 1 less."}
+}
+const OMEN_IDS = ["eclipse","tempest","plenty","favor","stillness"]
 # Pantheon Power: one hero ability per pantheon, usable once per turn for its Power cost.
 # target: "none" | "ally" (friendly unit) | "enemy" (enemy unit).
 const HERO_POWERS = {
@@ -123,6 +147,8 @@ const DECKS = {
 static func card(id: String) -> Dictionary:
  var result: Dictionary = CARDS[id].duplicate(true)
  result["id"] = id
+ # A portrait named after the card wins over a shared one, so cards can gain unique art over time.
+ if ResourceLoader.exists("res://assets/cards/art/%s.png" % id): result["art"] = id
  return result
 
 static func deck(faction: String) -> Array:
