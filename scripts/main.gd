@@ -131,6 +131,16 @@ func label(parent: Node, value: String, rect: Rect2, font_size: int = 20, color:
  parent.add_child(node)
  return node
 
+func skin_box(fill: Color, border: Color, glow: Color, glow_size: int, border_width: int = 2) -> StyleBoxFlat:
+ var style := StyleBoxFlat.new()
+ style.bg_color = fill
+ style.border_color = border
+ style.set_border_width_all(border_width)
+ style.set_corner_radius_all(4)
+ style.shadow_color = glow
+ style.shadow_size = glow_size
+ return style
+
 func button(parent: Node, value: String, rect: Rect2, action: Callable, primary: bool = false) -> Button:
  var node := Button.new()
  node.text = value
@@ -139,21 +149,171 @@ func button(parent: Node, value: String, rect: Rect2, action: Callable, primary:
  node.mouse_default_cursor_shape = Control.CURSOR_POINTING_HAND
  node.add_theme_font_override("font",BOLD)
  node.add_theme_font_size_override("font_size",19)
- node.add_theme_color_override("font_color",Color("17212a") if primary else GOLD)
- node.add_theme_color_override("font_hover_color",Color("101c24") if primary else CREAM)
- for state_name in ["normal","hover","pressed","disabled","focus"]:
-  var style := StyleBoxFlat.new()
-  style.bg_color = Color("d6b77c") if primary else Color("101d2aee")
-  if state_name == "hover": style.bg_color = Color("f0d49b") if primary else Color("25394b")
-  if state_name == "pressed": style.bg_color = Color("ab8b58") if primary else Color("3b4a51")
-  if state_name == "disabled": style.bg_color = Color("27323b")
-  style.border_color = Color("e0c995") if primary else Color("786849")
-  style.set_border_width_all(1 if state_name != "focus" else 2)
-  style.set_corner_radius_all(5)
-  node.add_theme_stylebox_override(state_name,style)
+ node.add_theme_color_override("font_color",Color("1d1608") if primary else Color("e6d3a3"))
+ node.add_theme_color_override("font_hover_color",Color("120d04") if primary else Color("ffffff"))
+ node.add_theme_color_override("font_pressed_color",Color("120d04") if primary else Color("ffffff"))
+ node.add_theme_color_override("font_disabled_color",Color("6f7a85"))
+ var gold_glow := Color(1.0,.82,.4,.38)
+ var teal_glow := Color(.3,.9,.85,.28)
+ if primary:
+  node.add_theme_stylebox_override("normal",skin_box(Color("e2bf6c"),Color("fff0b8"),gold_glow,8))
+  node.add_theme_stylebox_override("hover",skin_box(Color("f6da8e"),Color("ffffff"),Color(1.0,.86,.45,.6),14))
+  node.add_theme_stylebox_override("pressed",skin_box(Color("b8933f"),Color("e8c872"),gold_glow,4))
+  node.add_theme_stylebox_override("focus",skin_box(Color("e2bf6c"),Color("ffffff"),gold_glow,8))
+ else:
+  node.add_theme_stylebox_override("normal",skin_box(Color("0b1726f2"),Color("a08a57"),Color(0,0,0,.35),4))
+  node.add_theme_stylebox_override("hover",skin_box(Color("14283d"),Color("f0d49b"),teal_glow,10))
+  node.add_theme_stylebox_override("pressed",skin_box(Color("1c3349"),Color("c8ad72"),teal_glow,4))
+  node.add_theme_stylebox_override("focus",skin_box(Color("0b1726f2"),Color("f0d49b"),Color(0,0,0,.35),4))
+ node.add_theme_stylebox_override("disabled",skin_box(Color("232d38e6"),Color("454d56"),Color(0,0,0,0),0,1))
  node.pressed.connect(func(): sound("click"); action.call())
  parent.add_child(node)
  return node
+
+# --- Ornate skin helpers -------------------------------------------------------------
+func diamond(parent: Node, center: Vector2, size: float, color: Color = GOLD) -> Polygon2D:
+ var node := Polygon2D.new()
+ node.polygon = PackedVector2Array([center + Vector2(0,-size),center + Vector2(size,0),center + Vector2(0,size),center + Vector2(-size,0)])
+ node.color = color
+ parent.add_child(node)
+ return node
+
+func star_polygon(center: Vector2, outer: float, inner: float, points: int) -> PackedVector2Array:
+ var pts := PackedVector2Array()
+ for i in range(points * 2):
+  var radius := outer if i % 2 == 0 else inner
+  var angle := TAU * i / float(points * 2) - PI / 2.0
+  pts.append(center + Vector2(cos(angle),sin(angle)) * radius)
+ return pts
+
+func poly(parent: Node, points: PackedVector2Array, color: Color) -> Polygon2D:
+ var node := Polygon2D.new()
+ node.polygon = points
+ node.color = color
+ parent.add_child(node)
+ return node
+
+# Dark navy bar with a gold border and diamond studs on the left and right edges.
+func ornate_bar(parent: Node, rect: Rect2, studs: bool = true, fill: Color = Color("0a1626ee")) -> Panel:
+ var node := panel(parent,rect,fill,Color("b99a57"),5)
+ var style: StyleBoxFlat = node.get_theme_stylebox("panel")
+ style.set_border_width_all(2)
+ style.shadow_color = Color(1.0,.8,.4,.18)
+ style.shadow_size = 7
+ if studs:
+  diamond(parent,rect.position + Vector2(0,rect.size.y / 2.0),8.0,Color("e6c878"))
+  diamond(parent,rect.position + Vector2(rect.size.x,rect.size.y / 2.0),8.0,Color("e6c878"))
+ return node
+
+# Large side/tray panel: ornate texture frame when available, otherwise a flat gold-edged panel.
+func frame(parent: Node, rect: Rect2, modal_frame: bool = false) -> Panel:
+ var path := "res://assets/ui/%s.png" % ("modal_frame" if modal_frame else "panel_frame")
+ if not ResourceLoader.exists(path): return ornate_bar(parent,rect,false,Color("0b1725f2"))
+ var node := Panel.new()
+ node.position = rect.position
+ node.size = rect.size
+ var style := StyleBoxTexture.new()
+ style.texture = load(path)
+ var margin := 60.0 if modal_frame else 24.0
+ style.texture_margin_left = margin
+ style.texture_margin_right = margin
+ style.texture_margin_top = margin
+ style.texture_margin_bottom = margin
+ style.modulate_color = Color(1,1,1,.96)
+ node.add_theme_stylebox_override("panel",style)
+ node.mouse_filter = Control.MOUSE_FILTER_IGNORE
+ parent.add_child(node)
+ if not modal_frame:
+  # Reinforce the thin textured edge with a glowing gold outline.
+  var outline := Panel.new()
+  outline.position = rect.position + Vector2(2,2)
+  outline.size = rect.size - Vector2(4,4)
+  var edge := StyleBoxFlat.new()
+  edge.bg_color = Color(0,0,0,0)
+  edge.border_color = Color("c9a85ecc")
+  edge.set_border_width_all(2)
+  edge.set_corner_radius_all(3)
+  outline.add_theme_stylebox_override("panel",edge)
+  outline.mouse_filter = Control.MOUSE_FILTER_IGNORE
+  parent.add_child(outline)
+ return node
+
+func lane_slot(parent: Node, rect: Rect2) -> void:
+ var node := panel(parent,rect,Color("070f1a66"),Color("c9ad6aaa"),3)
+ var style: StyleBoxFlat = node.get_theme_stylebox("panel")
+ style.set_border_width_all(1)
+ for corner in [Vector2(5,5),Vector2(rect.size.x - 5,5),Vector2(5,rect.size.y - 5),Vector2(rect.size.x - 5,rect.size.y - 5)]:
+  diamond(parent,rect.position + corner,3.0,Color("d9bd74"))
+
+func gear_polygon(center: Vector2, radius: float) -> PackedVector2Array:
+ var pts := PackedVector2Array()
+ var teeth := 8
+ for i in range(teeth * 4):
+  var angle := TAU * i / float(teeth * 4)
+  var phase := i % 4
+  var r := radius if phase < 2 else radius * .78
+  pts.append(center + Vector2(cos(angle),sin(angle)) * r)
+ return pts
+
+func hamburger(parent: Node, pos: Vector2, color: Color = Color("e6d3a3")) -> void:
+ for i in range(3):
+  var bar := ColorRect.new()
+  bar.color = color
+  bar.position = pos + Vector2(0,i * 6)
+  bar.size = Vector2(18,2)
+  bar.mouse_filter = Control.MOUSE_FILTER_IGNORE
+  parent.add_child(bar)
+
+# Painted header: emblem, title, round plaque, turn indicator, menu and settings buttons.
+func draw_header(round_text: String = "", turn_text: String = "", turn_color: Color = TEAL, in_battle: bool = false) -> void:
+ var band := panel(content,Rect2(0,0,1600,76),Color("050c16f7"),Color("6e5c34"),0)
+ band.get_theme_stylebox("panel").set_border_width_all(0)
+ var line := ColorRect.new()
+ line.color = Color("c9a85e")
+ line.position = Vector2(0,74)
+ line.size = Vector2(1600,2)
+ content.add_child(line)
+ var glow := ColorRect.new()
+ glow.color = Color(.9,.7,.3,.12)
+ glow.position = Vector2(0,76)
+ glow.size = Vector2(1600,3)
+ content.add_child(glow)
+ var emblem_center := Vector2(46,38)
+ poly(content,star_polygon(emblem_center,34,24,16),Color("d9b865"))
+ poly(content,star_polygon(emblem_center,27,20,16),Color("2a1c08"))
+ var ring := PackedVector2Array()
+ for i in range(32): ring.append(emblem_center + Vector2(cos(TAU * i / 32.0),sin(TAU * i / 32.0)) * 18.0)
+ poly(content,ring,Color("0c1626"))
+ poly(content,star_polygon(emblem_center,16,7,8),Color("f2d489"))
+ var title := label(content,"OATHFALL",Rect2(94,2,330,52),46,Color("f6e4b4"),DISPLAY)
+ title.add_theme_color_override("font_outline_color",Color("2a1c08"))
+ title.add_theme_constant_override("outline_size",6)
+ label(content,"CLASH OF PANTHEONS",Rect2(100,50,300,22),13,Color("c9d3da"),BOLD)
+ if round_text != "":
+  var plaque := panel(content,Rect2(690,14,220,46),Color("07101bf0"),Color("d2b470"),4)
+  plaque.get_theme_stylebox("panel").set_border_width_all(2)
+  diamond(content,Vector2(690,37),10,Color("e6c878"))
+  diamond(content,Vector2(910,37),10,Color("e6c878"))
+  var round_label := label(content,round_text,Rect2(690,17,220,40),24,Color("f1deb0"),DISPLAY)
+  round_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+  round_label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+ if turn_text != "":
+  var turn := label(content,turn_text,Rect2(980,14,260,46),30,turn_color,DISPLAY)
+  turn.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+  turn.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+  turn.add_theme_color_override("font_outline_color",Color(turn_color.r,turn_color.g,turn_color.b,.45))
+  turn.add_theme_constant_override("outline_size",8)
+ if in_battle:
+  var menu := button(content,"MATCH MENU",Rect2(1324,16,206,44),show_pause)
+  menu.add_theme_font_size_override("font_size",18)
+  hamburger(content,Vector2(1500,31))
+  var gear := button(content,"",Rect2(1544,16,44,44),show_settings)
+  gear.flat = true
+  var gear_center := Vector2(1566,38)
+  poly(content,gear_polygon(gear_center,17),Color("c9ced4"))
+  var hub := PackedVector2Array()
+  for i in range(20): hub.append(gear_center + Vector2(cos(TAU * i / 20.0),sin(TAU * i / 20.0)) * 6.5)
+  poly(content,hub,Color("0d1824"))
 
 func icon(parent: Node, cell: int, rect: Rect2) -> void:
  var atlas := AtlasTexture.new()
@@ -251,7 +411,7 @@ func show_factions(mode: String = "duel") -> void:
   var column := p if p < 4 else p - 4
   var x := (1600 - per_row*389 + 17) / 2 + column*389
   var y := 150 if p < 4 else 520
-  panel(content,Rect2(x,y,372,350))
+  frame(content,Rect2(x,y,372,350))
   image(content,"res://assets/cards/art/%s.png" % info.art,Rect2(x+10,y+12,160,240))
   label(content,info.title,Rect2(x+180,y+14,185,90),20,GOLD,DISPLAY).autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
   var desc := label(content,info.text,Rect2(x+14,y+262,345,70),15,CREAM)
@@ -279,7 +439,7 @@ func open_modal(title_text: String, width: int = 1000, height: int = 740) -> Con
  body.position = origin
  body.size = Vector2(width,height)
  modal.add_child(body)
- panel(body,Rect2(0,0,width,height),Color("101d2bf8"),GOLD)
+ frame(body,Rect2(0,0,width,height),true)
  label(body,title_text,Rect2(35,20,width-140,55),32,GOLD,DISPLAY)
  button(body,"CLOSE",Rect2(width-135,25,105,42),close_modal)
  return body
@@ -358,7 +518,7 @@ func show_campaign(faction: String) -> void:
   var y := 140+(stage-1)*116
   var unlocked: bool = profile.stage_unlocked(faction,stage)
   var cleared: bool = profile.stage_cleared(faction) >= stage
-  panel(content,Rect2(250,y,1100,104),Color("0f1c2cee") if unlocked else Color("0a121cdd"),GOLD if cleared else Color("5a4e36"))
+  ornate_bar(content,Rect2(250,y,1100,104),cleared,Color("0f1c2cf2") if unlocked else Color("0a121ce6"))
   image(content,"res://assets/cards/art/%s.png" % FACTION_INFO[info.rival].art,Rect2(262,y+6,66,92))
   label(content,"STAGE %d · %s" % [stage,info.title.to_upper()],Rect2(350,y+12,640,32),22,GOLD if unlocked else Color("6f7d89"),DISPLAY)
   label(content,"vs %s · %s AI%s" % [FACTION_INFO[info.rival].title,profile.DIFFICULTY_NAMES[info.level],"  ·  +5 rival Sanctum health" if info.bonus_hp > 0 else ""],Rect2(350,y+52,700,30),18,CREAM if unlocked else Color("6f7d89"))
@@ -389,6 +549,26 @@ func target_valid(uid: int) -> bool:
   return DB.card(game.sides[0].hand[selection]).get("effect","") == "damage"
  return attacker >= 0 and game.can_attack(0,attacker,uid)
 
+func battle_background() -> void:
+ var left_path := "res://assets/backgrounds/bg_%s.jpg" % game.sides[0].faction.to_lower()
+ var right_path := "res://assets/backgrounds/bg_%s.jpg" % game.sides[1].faction.to_lower()
+ if not (ResourceLoader.exists(left_path) and ResourceLoader.exists(right_path)):
+  image(content,"res://assets/backgrounds/battlefield.png",Rect2(0,0,1600,900))
+  return
+ # Your pantheon's world on the left, the rival's on the right, blended across the middle.
+ image(content,left_path,Rect2(0,0,1600,900))
+ var right := image(content,right_path,Rect2(0,0,1600,900))
+ var shader := Shader.new()
+ shader.code = "shader_type canvas_item;\nvoid fragment() {\n vec4 c = texture(TEXTURE, UV);\n c.a *= smoothstep(0.30, 0.70, UV.x);\n COLOR = c;\n}\n"
+ var material := ShaderMaterial.new()
+ material.shader = shader
+ right.material = material
+ var shade := ColorRect.new()
+ shade.color = Color(.02,.04,.08,.22)
+ shade.size = Vector2(1600,900)
+ shade.mouse_filter = Control.MOUSE_FILTER_IGNORE
+ content.add_child(shade)
+
 func render_battle() -> void:
  if game == null: return
  if game.winner != -1:
@@ -396,16 +576,11 @@ func render_battle() -> void:
   return
  clear_screen()
  screen = "battle"
- image(content,"res://assets/backgrounds/battlefield.png",Rect2(0,0,1600,900))
- panel(content,Rect2(0,0,1600,63),Color("07111bf5"),Color("51442e"),0)
- label(content,"OATHFALL",Rect2(26,12,250,39),28,GOLD,DISPLAY)
- label(content,"CLASH OF PANTHEONS",Rect2(250,22,320,24),13,Color("a8b7bf"),BOLD)
- button(content,"MATCH MENU",Rect2(1370,12,205,40),show_pause)
- label(content,"ROUND %02d" % ceili(game.turn/2.0),Rect2(640,19,230,28),18,GOLD,BOLD)
- label(content,"YOUR TURN" if game.current == 0 else "RIVAL'S TURN",Rect2(960,18,300,30),20,TEAL if game.current==0 else Color("edaf8d"),BOLD)
+ battle_background()
+ draw_header("ROUND %02d" % ceili(game.turn/2.0),"YOUR TURN" if game.current == 0 else "RIVAL'S TURN",TEAL if game.current == 0 else Color("edaf8d"),true)
  var player: Dictionary = game.sides[0]
  var enemy: Dictionary = game.sides[1]
- panel(content,Rect2(250,77,1080,67),Color("111b27e8"))
+ ornate_bar(content,Rect2(250,84,1080,62))
  icon(content,2,Rect2(269,86,46,46))
  var enemy_button := button(content,"%s SANCTUM   %d / 25" % [enemy.faction.to_upper(),enemy.hp],Rect2(322,88,345,43),func(): choose_enemy(-1))
  if target_valid(-1): enemy_button.add_theme_color_override("font_color",TEAL)
@@ -416,27 +591,27 @@ func render_battle() -> void:
   image(content,"res://assets/cards/card_back.png",Rect2(884+i*34,85,32,48))
  label(content,"%d CARDS" % hidden_count,Rect2(1146,100,160,25),14,Color("a4b1bb"))
  label(content,"RIVAL'S FIELD",Rect2(275,152,260,24),13,Color("a8b7bf"),BOLD)
- label(content,"YOUR FIELD",Rect2(275,418,260,24),13,TEAL,BOLD)
+ label(content,"YOUR FIELD",Rect2(275,428,260,24),13,TEAL,BOLD)
  for side in range(2):
   var units: Array = game.sides[side].board
   var row_y := 454 if side==0 else 170
   for slot in range(5):
-   panel(content,Rect2(389+slot*173,row_y,150,211),Color("0c15255a"),Color("77705b45"))
+   lane_slot(content,Rect2(389+slot*173,row_y,150,211))
   var start_x := 790.0 - (units.size()*165.0-15.0)/2.0
   for i in range(units.size()):
    var unit_view = add_card(content,units[i],Vector2(start_x+i*165,row_y-7),Vector2(150,225),"board" if side==0 else "enemy",-1,side==0 and units[i].ready and game.current==0 and not busy)
    unit_positions[units[i].uid] = Vector2(start_x+i*165+75,row_y+105)
    unit_views[units[i].uid] = unit_view
- if player.board.is_empty(): label(content,"Summon your first ally from your hand.",Rect2(580,530,600,50),21,Color("9ca8b6"))
- if enemy.board.is_empty(): label(content,"The rival's field is empty.",Rect2(650,260,540,50),21,Color("788a9b"))
- panel(content,Rect2(252,681,1078,219),Color("091421d9"),Color("665536"),8)
+ if player.board.is_empty(): label(content,"Summon your first ally from your hand.",Rect2(389,540,860,50),21,Color("b4c0cc")).horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+ if enemy.board.is_empty(): label(content,"The rival's field is empty.",Rect2(389,258,860,50),21,Color("9fb0c0")).horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+ ornate_bar(content,Rect2(252,684,1078,214),true,Color("08121fe0"))
  var hand_size: int = player.hand.size()
  var step := minf(147.0,1030.0/maxi(hand_size,1))
  var hand_x := 790.0-(step*maxi(hand_size-1,0)+140)/2.0
  for i in range(hand_size):
   add_card(content,DB.card(player.hand[i]),Vector2(hand_x+i*step,686),Vector2(140,210),"hand",i,game.can_play(0,i) and not busy)
  render_inspector()
- panel(content,Rect2(1350,77,225,809),Color("0b1725ee"))
+ frame(content,Rect2(1346,84,233,804))
  icon(content,0,Rect2(1369,91,42,42))
  label(content,"POWER",Rect2(1417,91,140,27),14,GOLD,BOLD)
  label(content,"%d / %d" % [player.power,player.max_power],Rect2(1417,119,140,39),29,TEAL,BOLD)
@@ -459,7 +634,7 @@ func render_battle() -> void:
  for i in range(mini(game.history.size(),5)):
   var entry := label(content,game.history[i],Rect2(1368,536+i*47,191,45),14,Color("bac4cc") if i==0 else Color("8394a3"))
   entry.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
- panel(content,Rect2(273,393,1035,28),Color("0a1924ce"),Color("5f68534a"),4)
+ ornate_bar(content,Rect2(273,391,1035,32),true,Color("070f1af0"))
  var hint := label(content,notice,Rect2(289,393,1000,27),16,TEAL if attacker>=0 or selection>=0 else CREAM)
  hint.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
  play_fx()
@@ -470,7 +645,7 @@ func render_inspector() -> void:
   inspection.queue_free()
  inspection = Control.new()
  content.add_child(inspection)
- panel(inspection,Rect2(21,77,207,809),Color("0a1724ed"))
+ frame(inspection,Rect2(17,84,215,804))
  label(inspection,"CARD INSPECTION",Rect2(36,96,190,30),14,GOLD,BOLD)
  if inspected_data.is_empty(): return
  add_card(inspection,inspected_data,Vector2(33,141),Vector2(183,274.5),"inspect")
@@ -485,7 +660,10 @@ func render_inspector() -> void:
   else:
    var play := button(inspection,"CAST" if c.category=="Spell" else "SUMMON",Rect2(35,650,179,53),play_selected,true)
    play.disabled = not game.can_play(0,selection) or busy
- label(inspection,"Tap a card to inspect.\nGold outlines = playable.\nTeal outlines = targets.",Rect2(35,788,180,70),13,Color("8c9eac"))
+ var legend := [["Tap a card to inspect.",Color("d9bd74")],["Gold outlines = playable.",Color("f3d27a")],["Teal outlines = targets.",Color("5fe0d0")]]
+ for i in range(3):
+  diamond(inspection,Vector2(44,805+i*28),6,legend[i][1])
+  label(inspection,legend[i][0],Rect2(58,794+i*28,170,24),14,Color("b6c2cc"))
 
 func inspect(data: Dictionary) -> void:
  if screen != "battle" or game == null: return
@@ -627,7 +805,7 @@ func show_result() -> void:
  screen = "result"
  clear_screen()
  image(content,"res://assets/backgrounds/menu.png",Rect2(0,0,1600,900),Color(.38,.42,.48))
- panel(content,Rect2(400,135,800,640),Color("0b1826f0"),GOLD)
+ frame(content,Rect2(400,135,800,640),true)
  label(content,"THE OATH IS FULFILLED" if game.winner==0 else "THE REALMS REMEMBER",Rect2(510,185,670,40),18,TEAL,BOLD)
  var title := "VICTORY" if game.winner==0 else ("DRAW" if game.winner==2 else "DEFEAT")
  var headline := label(content,title,Rect2(430,243,740,100),69,GOLD,DISPLAY)
@@ -704,7 +882,7 @@ func show_deck_builder() -> void:
  var tabs: Array = [""] + DB.FACTIONS
  for i in range(tabs.size()):
   var tab: String = tabs[i]
-  var tab_button := button(content,"ALL" if tab == "" else tab.to_upper(),Rect2(480+i*148,18,138,44),func(): builder_filter = tab; show_deck_builder())
+  var tab_button := button(content,"ALL" if tab == "" else tab.to_upper(),Rect2(420+i*128,18,120,44),func(): builder_filter = tab; show_deck_builder())
   tab_button.disabled = builder_filter == tab
  var scroll := ScrollContainer.new()
  scroll.position = Vector2(24,96)
@@ -748,7 +926,7 @@ func render_builder_panel() -> void:
  if not is_instance_valid(builder_panel): return
  for child in builder_panel.get_children(): child.queue_free()
  var p := builder_panel
- panel(p,Rect2(1044,96,536,788),Color("0b1725f0"))
+ frame(p,Rect2(1044,96,536,788))
  label(p,"YOUR DECK",Rect2(1064,106,300,30),16,GOLD,BOLD)
  var problem: String = DB.validate_deck(builder_cards)
  label(p,"%d / %d" % [builder_cards.size(),DB.DECK_SIZE],Rect2(1400,104,160,34),24,TEAL if problem == "" else Color("edaf8d"),BOLD).horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
@@ -796,7 +974,7 @@ func render_builder_panel() -> void:
  label(p,"FILL FROM STARTER DECK",Rect2(1064,728,400,22),13,Color("8997a2"),BOLD)
  for i in range(DB.FACTIONS.size()):
   var faction: String = DB.FACTIONS[i]
-  button(p,faction.substr(0,3).to_upper(),Rect2(1064+i*80,752,74,36),func(): builder_cards = DB.deck(faction); builder_message = "Loaded the %s starter deck." % faction; builder_refresh())
+  button(p,faction.substr(0,3).to_upper(),Rect2(1064+i*71,752,66,36),func(): builder_cards = DB.deck(faction); builder_message = "Loaded the %s starter deck." % faction; builder_refresh())
  var play := button(p,"PLAY WITH THIS DECK",Rect2(1064,800,500,56),builder_play,true)
  play.disabled = problem != ""
 

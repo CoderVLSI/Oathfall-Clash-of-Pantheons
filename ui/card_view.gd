@@ -56,6 +56,20 @@ func text_at(value: String, rect: Rect2, font_size: int, color: Color = Color("f
  label.size = rect.size * card_size
  return label
 
+# Dark translucent backing so small labels stay readable over ornate frame patterns.
+func pill(rect: Rect2) -> void:
+ var node := Panel.new()
+ node.position = rect.position * card_size
+ node.size = rect.size * card_size
+ var style := StyleBoxFlat.new()
+ style.bg_color = Color(.03,.06,.12,.78)
+ style.set_corner_radius_all(int(rect.size.y * card_size.y * .45))
+ style.border_color = Color(.85,.7,.4,.55)
+ style.set_border_width_all(1)
+ node.add_theme_stylebox_override("panel",style)
+ node.mouse_filter = Control.MOUSE_FILTER_IGNORE
+ add_child(node)
+
 func build() -> void:
  if data.is_empty(): return
  for child in get_children(): child.queue_free()
@@ -70,25 +84,30 @@ func build() -> void:
  style.border_color = Color("72f2df") if selected or targetable else (Color("fce4a3") if playable else RARITY_COLORS.get(data.rarity,Color("a6acb6")))
  style.set_border_width_all(2)
  style.set_corner_radius_all(10)
- style.shadow_color = Color("35b4b070") if selected or targetable else Color(0,0,0,0.5)
- style.shadow_size = 10 if selected or targetable else 5
+ var rarity_color: Color = RARITY_COLORS.get(data.rarity,Color("a6acb6"))
+ style.shadow_color = Color("35b4b0b0") if selected or targetable else (Color(0.99,0.89,0.64,0.45) if playable else Color(rarity_color.r,rarity_color.g,rarity_color.b,0.4))
+ style.shadow_size = 10 if selected or targetable else (6 if playable else 5)
  border.add_theme_stylebox_override("panel",style)
  border.mouse_filter = Control.MOUSE_FILTER_IGNORE
  add_child(border)
- picture("res://assets/cards/art/%s.png" % data.get("art","zeus"),Rect2(.11,.125,.78,.49))
- var frame_path := "res://assets/cards/frames/epic_purple_v1.png" if data.rarity == "Epic" else "res://assets/cards/frames/master_frame_concept_v1.png"
+ # Pantheon-themed overlay frames let the illustration run full-bleed behind the ornament.
+ var themed_frame := "res://assets/cards/frames/frame_%s.png" % str(data.get("faction","")).to_lower()
+ var has_theme := ResourceLoader.exists(themed_frame)
+ picture("res://assets/cards/art/%s.png" % data.get("art","zeus"),Rect2(0,0,1,1) if has_theme else Rect2(.11,.125,.78,.49))
+ var frame_path := themed_frame if has_theme else ("res://assets/cards/frames/epic_purple_v1.png" if data.rarity == "Epic" else "res://assets/cards/frames/master_frame_concept_v1.png")
  var frame := picture(frame_path,Rect2(0,0,1,1))
  frame.stretch_mode = TextureRect.STRETCH_SCALE
  var factor := card_size.x/150.0
  text_at(str(data.cost),Rect2(.015,.035,.2,.13),int(22*factor))
- var name_label := text_at(data.name,Rect2(.225,.048,.64,.075),int(12*factor),Color("302317"),DISPLAY)
+ var name_label := text_at(data.name,Rect2(.245,.048,.55,.075) if has_theme else Rect2(.225,.048,.64,.075),int(12*factor),Color("302317"),DISPLAY)
  name_label.name = "CardName"
  name_label.autowrap_mode = TextServer.AUTOWRAP_OFF
  name_label.add_theme_color_override("font_shadow_color",Color.TRANSPARENT)
  var fitted_size := int(12*factor)
- while DISPLAY.get_string_size(data.name,HORIZONTAL_ALIGNMENT_LEFT,-1,fitted_size).x > card_size.x*.62 and fitted_size>7:
+ while DISPLAY.get_string_size(data.name,HORIZONTAL_ALIGNMENT_LEFT,-1,fitted_size).x > card_size.x*(.50 if has_theme else .62) and fitted_size>7:
   fitted_size-=1
  name_label.add_theme_font_size_override("font_size",fitted_size)
+ if has_theme: pill(Rect2(.27,.604,.46,.052))
  text_at(data.category.to_upper(),Rect2(.21,.600,.58,.06),int(8*factor),Color("e2c78b"))
  var short_rules: String = data.text
  if data.has("short"): short_rules = data.short
@@ -105,6 +124,7 @@ func build() -> void:
  rules.text = short_rules
  rules.add_theme_color_override("font_shadow_color",Color.TRANSPARENT)
  rules.size = Vector2(.70,.19)*card_size
+ if has_theme: pill(Rect2(.30,.932,.40,.058))
  var rarity := text_at(data.rarity.to_upper(),Rect2(.23,.94,.54,.05),int(7*factor),RARITY_COLORS.get(data.rarity,Color.GOLD))
  rarity.visible = mode != "board"
  if data.category != "Spell":

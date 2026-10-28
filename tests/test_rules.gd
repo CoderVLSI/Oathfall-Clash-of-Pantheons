@@ -331,6 +331,8 @@ func _initialize() -> void:
   var distinct := {}
   for id in ids: distinct[id]=true
   expect(distinct.size()>=12 and distinct.size()<=13,"%s has 12-13 distinct cards" % faction)
+  expect(ResourceLoader.exists("res://assets/cards/frames/frame_%s.png" % faction.to_lower()),"%s has a themed card frame" % faction)
+  expect(ResourceLoader.exists("res://assets/backgrounds/bg_%s.jpg" % faction.to_lower()),"%s has a battle background" % faction)
   for id in distinct: expect(ResourceLoader.exists("res://assets/cards/art/%s.png" % DB.CARDS[id].art),"%s art exists for %s" % [faction,id])
   expect(ids.size()==24,"%s deck has 24 cards" % faction)
   for id in ids: expect(DB.CARDS[id].faction==faction,"%s deck contains only its own cards" % faction)
