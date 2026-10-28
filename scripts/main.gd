@@ -294,7 +294,8 @@ func draw_header(round_text: String = "", turn_text: String = "", turn_color: Co
   plaque.get_theme_stylebox("panel").set_border_width_all(2)
   diamond(content,Vector2(690,37),10,Color("e6c878"))
   diamond(content,Vector2(910,37),10,Color("e6c878"))
-  var round_label := label(content,round_text,Rect2(690,17,220,40),24,Color("f1deb0"),DISPLAY)
+  sym_icon(content,"hourglass",Rect2(724,16,42,42),Color.WHITE,"Round")
+  var round_label := label(content,round_text,Rect2(774,17,110,40),28,Color("f1deb0"),DISPLAY)
   round_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
   round_label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
  if turn_text != "":
@@ -304,10 +305,12 @@ func draw_header(round_text: String = "", turn_text: String = "", turn_color: Co
   turn.add_theme_color_override("font_outline_color",Color(turn_color.r,turn_color.g,turn_color.b,.45))
   turn.add_theme_constant_override("outline_size",8)
  if in_battle:
-  var menu := button(content,"MATCH MENU",Rect2(1324,16,206,44),show_pause)
+  var menu := button(content,"",Rect2(1466,16,64,44),show_pause)
+  menu.tooltip_text = "Match menu"
   menu.add_theme_font_size_override("font_size",18)
-  hamburger(content,Vector2(1500,31))
+  hamburger(content,Vector2(1489,31))
   var gear := button(content,"",Rect2(1544,16,44,44),show_settings)
+  gear.tooltip_text = "Settings"
   gear.flat = true
   var gear_center := Vector2(1566,38)
   poly(content,gear_polygon(gear_center,17),Color("c9ced4"))
@@ -315,6 +318,21 @@ func draw_header(round_text: String = "", turn_text: String = "", turn_color: Co
   for i in range(20): hub.append(gear_center + Vector2(cos(TAU * i / 20.0),sin(TAU * i / 20.0)) * 6.5)
   poly(content,hub,Color("0d1824"))
 
+func sym_icon(parent: Node, symbol_name: String, rect: Rect2, tint: Color = Color.WHITE, tip: String = "") -> TextureRect:
+ var node := TextureRect.new()
+ node.texture = Symbols.tex(symbol_name)
+ node.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
+ node.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
+ node.position = rect.position
+ node.size = rect.size
+ node.modulate = tint
+ if tip != "":
+  node.tooltip_text = tip
+  node.mouse_filter = Control.MOUSE_FILTER_STOP
+ else:
+  node.mouse_filter = Control.MOUSE_FILTER_IGNORE
+ parent.add_child(node)
+ return node
 func icon(parent: Node, cell: int, rect: Rect2) -> void:
  var atlas := AtlasTexture.new()
  var texture: Texture2D = load("res://assets/ui/icons.png")
@@ -592,21 +610,23 @@ func render_battle() -> void:
  clear_screen()
  screen = "battle"
  battle_background()
- draw_header("ROUND %02d" % ceili(game.turn/2.0),"YOUR TURN" if game.current == 0 else "RIVAL'S TURN",TEAL if game.current == 0 else Color("edaf8d"),true)
+ draw_header("%d" % ceili(game.turn/2.0),"YOUR TURN" if game.current == 0 else "RIVAL'S TURN",TEAL if game.current == 0 else Color("edaf8d"),true)
  var player: Dictionary = game.sides[0]
  var enemy: Dictionary = game.sides[1]
  ornate_bar(content,Rect2(250,84,1080,62))
- icon(content,2,Rect2(269,86,46,46))
- var enemy_button := button(content,"%s SANCTUM   %d / 25" % [enemy.faction.to_upper(),enemy.hp],Rect2(322,88,345,43),func(): choose_enemy(-1))
+ sym_icon(content,"emblem_" + enemy.faction.to_lower(),Rect2(264,88,54,54),Color.WHITE,"%s pantheon" % enemy.faction)
+ icon(content,2,Rect2(326,92,44,44))
+ var enemy_button := button(content,"%d / 25" % enemy.hp,Rect2(378,88,180,43),func(): choose_enemy(-1))
+ enemy_button.tooltip_text = "%s Sanctum: tap to attack it." % enemy.faction
+ enemy_button.add_theme_font_size_override("font_size",24)
  if target_valid(-1): enemy_button.add_theme_color_override("font_color",TEAL)
  icon(content,0,Rect2(685,89,40,40))
  label(content,"%d / %d" % [enemy.power,enemy.max_power],Rect2(731,97,120,29),19,TEAL,BOLD)
  var hidden_count: int = enemy.hand.size()
  for i in range(mini(hidden_count,7)):
   image(content,"res://assets/cards/card_back.png",Rect2(884+i*34,85,32,48))
- label(content,"%d CARDS" % hidden_count,Rect2(1146,100,160,25),14,Color("a4b1bb"))
- label(content,"RIVAL'S FIELD",Rect2(275,152,260,24),13,Color("a8b7bf"),BOLD)
- label(content,"YOUR FIELD",Rect2(275,428,260,24),13,TEAL,BOLD)
+ sym_icon(content,"hand",Rect2(1126,90,46,46),Color.WHITE,"Rival's hand")
+ label(content,str(hidden_count),Rect2(1178,96,70,36),26,Color("c3ced8"),BOLD)
  for side in range(2):
   var units: Array = game.sides[side].board
   var row_y := 454 if side==0 else 170
@@ -628,32 +648,38 @@ func render_battle() -> void:
  render_inspector()
  frame(content,Rect2(1346,84,233,804))
  icon(content,0,Rect2(1369,91,42,42))
- label(content,"POWER",Rect2(1417,91,140,27),14,GOLD,BOLD)
- label(content,"%d / %d" % [player.power,player.max_power],Rect2(1417,119,140,39),29,TEAL,BOLD)
+ label(content,"%d / %d" % [player.power,player.max_power],Rect2(1417,93,140,39),32,TEAL,BOLD)
  icon(content,2,Rect2(1369,174,40,40))
- label(content,"YOUR SANCTUM",Rect2(1417,174,150,25),13,GOLD,BOLD)
- label(content,"%d / 25" % player.hp,Rect2(1417,201,140,38),29,CREAM,BOLD)
+ label(content,"%d / 25" % player.hp,Rect2(1417,174,140,38),32,CREAM,BOLD)
  icon(content,5,Rect2(1368,254,38,38))
- label(content,"DECK  %d    HAND  %d" % [player.deck.size(),player.hand.size()],Rect2(1411,262,160,30),13,Color("acb9c4"))
+ label(content,str(player.deck.size()),Rect2(1412,256,56,32),24,CREAM,BOLD)
+ sym_icon(content,"hand",Rect2(1476,252,38,38),Color.WHITE,"Cards in your hand")
+ label(content,str(player.hand.size()),Rect2(1518,256,50,32),24,CREAM,BOLD)
  var end := button(content,"END TURN" if not busy else "RIVAL THINKING…",Rect2(1366,322,193,60),end_player_turn,true)
  end.disabled = busy or game.current!=0
- button(content,"CANCEL",Rect2(1366,394,193,40),cancel_selection).disabled = busy
+ var cancel_button := button(content,"×",Rect2(1366,394,193,40),cancel_selection)
+ cancel_button.add_theme_font_size_override("font_size",32)
+ cancel_button.tooltip_text = "Cancel selection"
+ cancel_button.disabled = busy
  var hero: Dictionary = game.hero_power_of(0)
  var hero_ready: bool = game.current == 0 and not busy and ((game.can_use_power(0)) if hero.target == "none" else (not game.power_targets(0).is_empty()))
- var hero_button := button(content,"%s · %d" % [hero.name.to_upper(),game.power_cost(0)],Rect2(1366,444,193,56),hero_power_pressed)
+ var hero_button := button(content,"",Rect2(1366,444,193,56),hero_power_pressed)
+ sym_icon(hero_button,"emblem_" + game.sides[0].faction.to_lower(),Rect2(12,6,44,44))
+ icon(hero_button,0,Rect2(112,12,32,32))
+ label(hero_button,str(game.power_cost(0)),Rect2(150,8,34,40),28,TEAL,BOLD)
  hero_button.disabled = not hero_ready and not power_mode
- hero_button.tooltip_text = hero.text
+ hero_button.tooltip_text = "%s (%d Power)\n%s" % [hero.name,game.power_cost(0),hero.text]
+ if hero_button.disabled and not power_mode: hero_button.modulate = Color(1,1,1,.55)
  hero_button.add_theme_font_size_override("font_size",15)
  if power_mode: hero_button.add_theme_color_override("font_color",TEAL)
- label(content,"BATTLE CHRONICLE",Rect2(1368,506,205,24),13,GOLD,BOLD)
- for i in range(mini(game.history.size(),2)):
-  var entry := label(content,game.history[i],Rect2(1368,530+i*44,191,42),13,Color("bac4cc") if i==0 else Color("8394a3"))
+ for i in range(mini(game.history.size(),1)):
+  var entry := label(content,game.history[i],Rect2(1368,512,191,60),13,Color("bac4cc"))
   entry.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
  ornate_bar(content,Rect2(273,391,1035,32),true,Color("070f1af0"))
  var hint := label(content,notice,Rect2(289,393,1000,27),16,TEAL if attacker>=0 or selection>=0 else CREAM)
  hint.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
- draw_oath_box(0,636.0)
- draw_oath_box(1,760.0)
+ draw_oath_box(0,668.0)
+ draw_oath_box(1,772.0)
  draw_omen_plaque()
  play_fx()
 
@@ -664,10 +690,11 @@ func render_inspector() -> void:
  inspection = Control.new()
  content.add_child(inspection)
  frame(inspection,Rect2(17,84,215,804))
- label(inspection,"CARD INSPECTION",Rect2(36,96,190,30),14,GOLD,BOLD)
  if inspected_data.is_empty(): return
  add_card(inspection,inspected_data,Vector2(33,141),Vector2(183,274.5),"inspect")
- label(inspection,inspected_data.faction.to_upper()+" · "+inspected_data.rarity.to_upper(),Rect2(34,435,185,30),12,GOLD,BOLD)
+ sym_icon(inspection,"emblem_" + str(inspected_data.faction).to_lower(),Rect2(34,430,36,36),Color.WHITE,str(inspected_data.faction))
+ sym_icon(inspection,str(inspected_data.category).to_lower(),Rect2(80,430,36,36),Color.WHITE,str(inspected_data.category))
+ sym_icon(inspection,str(inspected_data.rarity).to_lower(),Rect2(126,430,36,36),Color.WHITE,str(inspected_data.rarity))
  var desc := label(inspection,inspected_data.text,Rect2(35,482,178,136),18)
  desc.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
  if selection>=0 and selection<game.sides[0].hand.size():
@@ -678,10 +705,6 @@ func render_inspector() -> void:
   else:
    var play := button(inspection,"CAST" if c.category=="Spell" else "SUMMON",Rect2(35,650,179,53),play_selected,true)
    play.disabled = not game.can_play(0,selection) or busy
- var legend := [["Tap a card to inspect.",Color("d9bd74")],["Gold outlines = playable.",Color("f3d27a")],["Teal outlines = targets.",Color("5fe0d0")]]
- for i in range(3):
-  diamond(inspection,Vector2(44,805+i*28),6,legend[i][1])
-  label(inspection,legend[i][0],Rect2(58,794+i*28,170,24),14,Color("b6c2cc"))
 
 func inspect(data: Dictionary) -> void:
  if screen != "battle" or game == null: return
@@ -1265,33 +1288,40 @@ func draw_oath_box(side: int, y: float) -> void:
  var progress: int = game.oath_progress(side)
  var goal: int = oath.goal
  var mine := side == 0
- ornate_bar(content,Rect2(1362,y,201,116),false,Color("0a1626f2"))
- label(content,"YOUR OATH" if mine else "RIVAL'S OATH",Rect2(1374,y+6,180,18),11,TEAL if mine else Color("edaf8d"),BOLD)
- var oath_name := label(content,oath.name,Rect2(1374,y+21,182,24),15,GOLD,BOLD)
- oath_name.clip_text = true
- panel(content,Rect2(1374,y+50,126,10),Color("1b2733"),Color("4c4430"),4)
+ ornate_bar(content,Rect2(1362,y,201,92),false,Color("0a1626f2"))
+ sym_icon(content,"oath",Rect2(1372,y+8,34,34))
+ var oath_name := label(content,oath.name,Rect2(1410,y+4,112,40),13,GOLD,BOLD)
+ oath_name.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+ oath_name.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+ sym_icon(content,"emblem_" + game.sides[side].faction.to_lower(),Rect2(1524,y+8,32,32))
+ panel(content,Rect2(1374,y+56,126,12),Color("1b2733"),Color("4c4430"),4)
  var ratio := clampf(float(progress) / float(goal),0.0,1.0)
- if ratio > 0.0: panel(content,Rect2(1374,y+50,maxf(126.0 * ratio,6.0),10),Color("72d6cc") if mine else Color("e59b7c"),Color.TRANSPARENT,4)
- label(content,"%d / %d" % [mini(progress,goal),goal],Rect2(1506,y+45,52,20),14,CREAM,BOLD)
- var text := label(content,oath.text if mine else str(oath.text).replace("your","their"),Rect2(1374,y+67,184,46),11,Color("b6c2cc"))
- text.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
-
+ if ratio > 0.0: panel(content,Rect2(1374,y+56,maxf(126.0 * ratio,6.0),12),Color("72d6cc") if mine else Color("e59b7c"),Color.TRANSPARENT,4)
+ label(content,"%d / %d" % [mini(progress,goal),goal],Rect2(1506,y+50,52,24),16,CREAM,BOLD)
+ var tip := Control.new()
+ tip.position = Vector2(1362,y)
+ tip.size = Vector2(201,92)
+ tip.tooltip_text = "%s%s\n%s" % ["Your oath: " if mine else "Rival's oath: ",oath.name,oath.text if mine else str(oath.text).replace("your","their")]
+ content.add_child(tip)
 func draw_omen_plaque() -> void:
- var text := ""
- var color := Color("f4cc79")
- if game.omen != "":
-  var info: Dictionary = DB.OMENS[game.omen]
-  text = "OMEN · %s — %s" % [info.name.to_upper(),info.text]
- elif game.pending_omen != "":
-  var coming: Dictionary = DB.OMENS[game.pending_omen]
-  text = "OMEN LOOMS · %s NEXT ROUND — %s" % [coming.name.to_upper(),coming.text]
-  color = Color("a9bccb")
- if text == "": return
- ornate_bar(content,Rect2(500,148,600,22),true,Color("0a1626f2"))
- var line := label(content,text,Rect2(500,148,600,22),12,color,BOLD)
- line.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
- line.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
-
+ var omen_id: String = game.omen if game.omen != "" else game.pending_omen
+ if omen_id == "": return
+ var looming: bool = game.omen == ""
+ var info: Dictionary = DB.OMENS[omen_id]
+ var color := Color("a9bccb") if looming else Color("f4cc79")
+ var plaque := ornate_bar(content,Rect2(620,148,360,24),true,Color("0a1626f2"))
+ var x := 660.0
+ if looming:
+  sym_icon(content,"hourglass",Rect2(x,149,22,22),color)
+  x += 30.0
+ sym_icon(content,"omen",Rect2(x,148,26,26),color)
+ var name_label := label(content,str(info.name).to_upper(),Rect2(x + 32.0,148,220,24),14,color,BOLD)
+ name_label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+ var tip := Control.new()
+ tip.position = plaque.position
+ tip.size = plaque.size
+ tip.tooltip_text = "%s%s: %s" % ["Next round: " if looming else "Omen: ",info.name,info.text]
+ content.add_child(tip)
 func _unhandled_key_input(event: InputEvent) -> void:
  if event.is_action_pressed("ui_cancel"):
   if is_instance_valid(modal): close_modal()
