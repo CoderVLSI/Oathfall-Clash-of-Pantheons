@@ -55,7 +55,7 @@ func _ready() -> void:
  add_child(fx_layer)
  sound_player = AudioStreamPlayer.new()
  add_child(sound_player)
- for key in ["click","summon","attack","win","lose","heal","damage","draw","ward","death","turn","buff"]:
+ for key in ["click","summon","attack","win","lose","heal","damage","draw","ward","death","turn","buff","omen","oath"]:
   if ResourceLoader.exists("res://assets/audio/%s.wav" % key): sound_bank[key] = load("res://assets/audio/%s.wav" % key)
  music_player = AudioStreamPlayer.new()
  add_child(music_player)
@@ -1079,14 +1079,14 @@ func play_fx() -> void:
    "omen":
     turn_banner("OMEN · %s" % DB.OMENS[event.extra].name.to_upper(),Color("f4cc79"),delay)
     delay += 1.3
-    sound("turn")
+    sound("omen" if sound_bank.has("omen") else "turn")
    "omen_warning":
     turn_banner("OMEN LOOMS · %s" % DB.OMENS[event.extra].name.to_upper(),Color("a9bccb"),delay)
     delay += 1.3
    "oath":
     turn_banner("OATH FULFILLED",Color("f4cc79"),delay)
     flash_screen(Color("f4cc79"))
-    sound("win")
+    sound("oath" if sound_bank.has("oath") else "win")
    "turn":
     if game.turn > 1:
      turn_banner("YOUR TURN" if event.side == 0 else "RIVAL'S TURN",TEAL if event.side == 0 else Color("edaf8d"),delay)
