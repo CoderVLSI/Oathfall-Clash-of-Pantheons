@@ -26,10 +26,10 @@ func run() -> void:
    card.mode="inspect"
    root.add_child(card)
    await process_frame
-   var rules: Label=card.get_node("RulesText")
+   var symbols: Control=card.get_node("Symbols")
    var name_label: Label=card.get_node("CardName")
-   verify(rules.position.x+rules.size.x<=dimensions.x,"Card rules stay within frame: "+card_id)
-   verify(rules.get_visible_line_count()>=rules.get_line_count(),"Card rules are fully visible: "+card_id)
+   verify(symbols.position.x+symbols.size.x<=dimensions.x,"Card symbols stay within frame: "+card_id)
+   verify(card.symbols_fit,"Card symbols fit on the parchment: "+card_id)
    verify(name_label.get_line_count()==1,"Card title stays on one line: "+card_id)
    if card.data.category!="Spell":
     verify(card.get_node("AttackValue").get_visible_line_count()==1,"Attack numeral is visible: "+card_id)

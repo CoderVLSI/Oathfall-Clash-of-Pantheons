@@ -447,7 +447,21 @@ func _initialize() -> void:
  for id in DB.CARDS:
   var art_id: String=DB.card(id).art
   expect(not art_owner.has(art_id),"Card %s shares artwork '%s' with %s" % [id,art_id,art_owner.get(art_id,"")])
-  art_owner[art_id]=id # Every card definition is well formed and every deck is legal.
+  art_owner[art_id]=id # Card faces use symbols: every ability, category, rarity and pantheon icon must exist.
+ for id in DB.CARDS:
+  var card_data: Dictionary=DB.card(id)
+  for chip in Symbols.chips(card_data): expect(Symbols.tex(chip.icon)!=null,"%s ability icon '%s' exists" % [id,chip.icon])
+  expect(Symbols.category(card_data.category)!=null,"%s has a category icon" % id)
+  expect(Symbols.rarity(card_data.rarity)!=null,"%s has a rarity icon" % id)
+  expect(Symbols.emblem(card_data.faction)!=null,"%s has a pantheon emblem" % id)
+ var aphrodite_icons := []
+ for chip in Symbols.chips(DB.card("aphrodite")): aphrodite_icons.append(chip.icon)
+ expect(aphrodite_icons==["lifesteal","arrival","heal"],"Aphrodite shows lifesteal plus an arrival heal")
+ var hydra_chips: Array=Symbols.chips(DB.card("hydra"))
+ expect(hydra_chips.size()==2 and hydra_chips[0].icon=="deathrattle" and hydra_chips[1].icon=="draw" and hydra_chips[1].value=="2","Hydra shows a deathrattle that draws 2")
+ expect(Symbols.chips(DB.card("hoplite")).is_empty(),"A vanilla unit shows no ability icons")
+ var bolt_chips: Array=Symbols.chips(DB.card("bolt"))
+ expect(bolt_chips.size()==1 and bolt_chips[0].icon=="damage" and bolt_chips[0].value=="3","Bolt shows 3 damage") # Every card definition is well formed and every deck is legal.
  for id in DB.CARDS:
   var c=DB.card(id)
   expect(c.cost>=0 and c.cost<=10 and c.has("text") and c.has("rarity"),"Card %s has core fields" % id)
