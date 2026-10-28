@@ -55,7 +55,7 @@ func start(faction: String = "Greek", seed_value: int = 0, rival: String = "", p
    var temp = deck[i]
    deck[i] = deck[j]
    deck[j] = temp
-  sides.append({"faction":f,"hp":MAX_HP,"power":0,"max_power":0,"deck":deck,"hand":[],"board":[],"fatigue":0,"power_used":false})
+  sides.append({"faction":f,"hp":MAX_HP,"power":0,"max_power":0,"deck":deck,"hand":[],"board":[],"fatigue":0,"power_used":false,"mulligan_done":false})
  for p in range(2):
   for i in range(4): draw_card(p)
  begin_turn(0)
@@ -533,3 +533,42 @@ func ai_power_action() -> Dictionary:
    best = uid
  if best_score < 0.0: return {}
  return {"type":"power","target":best}
+
+# --- Mulligan -------------------------------------------------------------------------
+# Once per side, before the first turn passes: shuffle the chosen hand cards back into the
+# deck and draw the same number of replacements. Returns how many cards were swapped.
+func can_mulligan(p: int) -> bool:
+ return winner == -1 and turn <= 1 and p >= 0 and p < sides.size() and not sides[p].mulligan_done
+
+func mulligan(p: int, indices: Array) -> int:
+ if not can_mulligan(p): return -1
+ var s: Dictionary = sides[p]
+ s.mulligan_done = true
+ var picked: Array = []
+ for index in indices:
+  if index is int and index >= 0 and index < s.hand.size() and not picked.has(index): picked.append(index)
+ picked.sort()
+ picked.reverse()
+ var returned: Array = []
+ for index in picked: returned.append(s.hand.pop_at(index))
+ if returned.is_empty(): return 0
+ # Draw the replacements first so a swapped card cannot come straight back, then reshuffle.
+ for i in range(returned.size()):
+  if s.deck.is_empty(): break
+  s.hand.append(s.deck.pop_back())
+ for card_id in returned: s.deck.append(card_id)
+ for i in range(s.deck.size() - 1, 0, -1):
+  var j := rng.randi_range(0,i)
+  var temp = s.deck[i]
+  s.deck[i] = s.deck[j]
+  s.deck[j] = temp
+ log_event("%s swapped %d opening card%s." % [s.faction,returned.size(),"" if returned.size() == 1 else "s"])
+ return returned.size()
+
+# The AI throws back expensive cards it cannot cast early (at most two), keeping the rest.
+func ai_mulligan() -> int:
+ if not can_mulligan(1): return -1
+ var picks: Array = []
+ for i in range(sides[1].hand.size()):
+  if DB.card(sides[1].hand[i]).cost >= 5 and picks.size() < 2: picks.append(i)
+ return mulligan(1,picks)

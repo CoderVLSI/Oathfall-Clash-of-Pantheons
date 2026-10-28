@@ -287,6 +287,35 @@ func _initialize() -> void:
  var saw_power := false
  for e in m.drain_fx(): if e.type=="power": saw_power=true
  expect(saw_power,"Using a power emits a power event")
+ # Mulligan: swap chosen opening cards once, only before the first turn passes.
+ m=MATCH.new()
+ m.start("Greek",11,"Norse")
+ var hand_before: Array=m.sides[0].hand.duplicate()
+ var deck_size: int=m.sides[0].deck.size()
+ expect(m.can_mulligan(0) and m.can_mulligan(1),"Both sides may mulligan at the start")
+ expect(m.mulligan(0,[0,1,1,99,-3,"x"])==2,"Mulligan ignores duplicate and invalid indices")
+ expect(m.sides[0].hand.size()==hand_before.size() and m.sides[0].deck.size()==deck_size,"Mulligan keeps hand and deck sizes")
+ expect(m.sides[0].hand[0]==hand_before[2] or hand_before.size()<3,"Kept cards stay in the hand")
+ expect(m.mulligan(0,[0])==-1 and not m.can_mulligan(0),"A side can only mulligan once")
+ var all_cards: Array=m.sides[0].hand+m.sides[0].deck
+ var before_all: Array=hand_before+m.sides[0].deck.duplicate()
+ expect(all_cards.size()==DB.DECK_SIZE,"Mulligan never loses or duplicates cards")
+ m=MATCH.new()
+ m.start("Greek",12,"Norse")
+ expect(m.mulligan(0,[])==0 and not m.can_mulligan(0),"Keeping the hand still uses the mulligan")
+ m=MATCH.new()
+ m.start("Roman",13,"Aztec")
+ m.end_turn(0)
+ expect(not m.can_mulligan(1) and m.mulligan(1,[0])==-1,"No mulligan once the first turn has passed")
+ m=MATCH.new()
+ m.start("Greek",14,"Norse")
+ m.sides[1].hand=["zeus","jupiter","hoplite","bolt","thor"]
+ m.sides[1].deck=["hoplite","hoplite","hoplite","hoplite","hoplite","hoplite"]
+ var swapped: int=m.ai_mulligan()
+ var costly := 0
+ for id in m.sides[1].hand: if DB.CARDS[id].cost>=5: costly+=1
+ expect(swapped==2 and costly==1 and m.sides[1].hand.size()==5,"AI swaps at most two expensive cards")
+ expect(m.winner==-1 and m.turn==1,"Mulligan does not advance the match")
  # Every card definition is well formed and every deck is legal.
  for id in DB.CARDS:
   var c=DB.card(id)

@@ -42,6 +42,7 @@ var builder_panel: Control
 var fx_layer: Control
 var music_player: AudioStreamPlayer
 var power_mode := false
+var mulligan_marks: Array = []
 var unit_positions: Dictionary = {}
 var unit_views: Dictionary = {}
 
@@ -289,7 +290,7 @@ func close_modal() -> void:
 
 func show_rules() -> void:
  var body := open_modal("THE RULES OF OATHFALL",1060,760)
- var text := "WIN THE DUEL\nReduce the opposing Sanctum from 25 health to zero. Both starter decks contain 24 cards.\n\nYOUR TURN\nGain one maximum Power (up to 10), refill it, ready your units, and draw one card.\nTap a card in your hand, then SUMMON / CAST in the left panel. Damage spells need a target.\n\nCOMBAT\nTap a ready friendly unit, then an enemy unit or the enemy Sanctum. Both units deal damage\nsimultaneously. Every unit attacks once per turn. New units rest until your next turn.\n\nKEYWORDS\nGUARD — Defeat enemy Guards before attacking other units or the Sanctum.\nRUSH — A newly summoned unit may attack units immediately, but not the Sanctum.\nARRIVAL — An effect happens once when the unit enters the battlefield.\nHERO POWER — Each pantheon has an ability usable once per turn for its Power cost. Press the HERO POWER button, then pick a target if asked.\nWARD — The first damage the unit would take is prevented.\nLIFESTEAL — Damage the unit deals restores your Sanctum.\nDEATHRATTLE — An effect happens when the unit dies.\nDamage spells ignore Guard. Healing never exceeds 25 health. Your board holds 5 units.\n\nRUNNING OUT OF CARDS\nAn empty deck deals increasing fatigue damage each draw. Full hands (9 cards) burn new draws.\n\nCONTROLS\nClick or tap cards to inspect and select them. Use the left panel to confirm a play.\nCancel a selection with Escape or CANCEL. End Turn gives control to the AI.\nThe match menu pauses AI actions. Concede ends the match; rematch starts a fresh duel."
+ var text := "WIN THE DUEL\nReduce the opposing Sanctum from 25 health to zero. Both starter decks contain 24 cards.\n\nYOUR TURN\nGain one maximum Power (up to 10), refill it, ready your units, and draw one card.\nTap a card in your hand, then SUMMON / CAST in the left panel. Damage spells need a target.\n\nCOMBAT\nTap a ready friendly unit, then an enemy unit or the enemy Sanctum. Both units deal damage\nsimultaneously. Every unit attacks once per turn. New units rest until your next turn.\n\nKEYWORDS\nGUARD — Defeat enemy Guards before attacking other units or the Sanctum.\nRUSH — A newly summoned unit may attack units immediately, but not the Sanctum.\nARRIVAL — An effect happens once when the unit enters the battlefield.\nHERO POWER — Each pantheon has an ability usable once per turn for its Power cost. Press the HERO POWER button, then pick a target if asked.\nWARD — The first damage the unit would take is prevented.\nLIFESTEAL — Damage the unit deals restores your Sanctum.\nDEATHRATTLE — An effect happens when the unit dies.\nDamage spells ignore Guard. Healing never exceeds 25 health. Your board holds 5 units.\n\nOPENING HAND\nBefore your first turn you may swap any of your opening cards once. Swapped cards are replaced from your deck first, then shuffled back in.\n\nRUNNING OUT OF CARDS\nAn empty deck deals increasing fatigue damage each draw. Full hands (9 cards) burn new draws.\n\nCONTROLS\nClick or tap cards to inspect and select them. Use the left panel to confirm a play.\nCancel a selection with Escape or CANCEL. End Turn gives control to the AI.\nThe match menu pauses AI actions. Concede ends the match; rematch starts a fresh duel."
  var node := label(body,text,Rect2(38,93,980,630),20,CREAM)
  node.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 
@@ -335,6 +336,7 @@ func start_match(faction: String, stage: int = 0, deck_cards: Array = []) -> voi
  power_mode = false
  game.start(faction,0,match_rival,deck_cards)
  if bonus_hp > 0: game.sides[1].hp += bonus_hp
+ game.ai_mulligan()
  match_rival = game.sides[1].faction
  selection = -1
  attacker = -1
@@ -343,6 +345,7 @@ func start_match(faction: String, stage: int = 0, deck_cards: Array = []) -> voi
  inspected_data = DB.card(game.sides[0].hand[0])
  notice = "Your oath begins. Select a card from your hand."
  render_battle()
+ if not testing: show_mulligan()
 
 func show_campaign(faction: String) -> void:
  screen = "campaign"
@@ -985,6 +988,53 @@ func turn_banner(text: String, color: Color) -> void:
  tween.tween_interval(.55)
  tween.tween_property(band,"position:x",1600.0,.28).set_trans(Tween.TRANS_CUBIC).set_ease(Tween.EASE_IN)
  tween.tween_callback(band.queue_free)
+
+func show_mulligan() -> void:
+ if game == null or not game.can_mulligan(0): return
+ mulligan_marks = []
+ render_mulligan()
+
+func toggle_mulligan(index: int) -> void:
+ if mulligan_marks.has(index): mulligan_marks.erase(index)
+ else: mulligan_marks.append(index)
+ sound("click")
+ render_mulligan()
+
+func render_mulligan() -> void:
+ var body := open_modal("OPENING HAND · SWAP CARDS",1060,560)
+ var hint := label(body,"Tap the cards you want to replace, then confirm. You may swap once per match.",Rect2(38,84,980,32),19,Color("c0c6ca"))
+ hint.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+ var hand: Array = game.sides[0].hand
+ var step := minf(190.0,880.0 / maxi(hand.size(),1))
+ var x0 := (1060.0 - (step * maxi(hand.size() - 1,0) + 150.0)) / 2.0
+ for i in range(hand.size()):
+  var view = CARD.instantiate()
+  view.data = DB.card(hand[i])
+  view.card_size = Vector2(150,225)
+  view.mode = "inspect"
+  view.position = Vector2(x0 + i * step,135)
+  view.tooltip_text = "%s · cost %d\n%s" % [view.data.name,view.data.cost,view.data.text]
+  view.chosen.connect(func(_v): toggle_mulligan(i))
+  var marked := mulligan_marks.has(i)
+  if marked: view.modulate = Color(1.0,.55,.55,.7)
+  body.add_child(view)
+  if marked:
+   var tag := label(body,"REPLACE",Rect2(x0 + i * step,225,150,40),22,Color("ff9a8a"),BOLD)
+   tag.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+   tag.add_theme_color_override("font_outline_color",Color(0,0,0,.9))
+   tag.add_theme_constant_override("outline_size",6)
+ button(body,"KEEP THIS HAND",Rect2(190,440,320,62),func(): confirm_mulligan(false),mulligan_marks.is_empty())
+ var swap := button(body,"SWAP %d CARD%s" % [mulligan_marks.size(),"" if mulligan_marks.size() == 1 else "S"],Rect2(550,440,320,62),func(): confirm_mulligan(true),not mulligan_marks.is_empty())
+ swap.disabled = mulligan_marks.is_empty()
+
+func confirm_mulligan(swap: bool) -> void:
+ if game == null: return
+ game.mulligan(0,mulligan_marks if swap else [])
+ mulligan_marks = []
+ close_modal()
+ if not game.sides[0].hand.is_empty(): inspected_data = DB.card(game.sides[0].hand[0])
+ notice = game.history[0] if swap and game.history.size() > 0 else "Your oath begins. Select a card from your hand."
+ render_battle()
 
 func _unhandled_key_input(event: InputEvent) -> void:
  if event.is_action_pressed("ui_cancel"):

@@ -149,6 +149,28 @@ func run() -> void:
  app.hero_power_pressed()
  await process_frame
  verify(app.game.sides[0].hand.size()==hand_before+1 and not app.power_mode,"Targetless hero power fires immediately")
+ # Opening-hand mulligan screen.
+ app.start_match("Norse")
+ await process_frame
+ app.show_mulligan()
+ await process_frame
+ verify(is_instance_valid(app.modal) and app.game.can_mulligan(0),"Mulligan screen opens at the start of a match")
+ var hand_size: int=app.game.sides[0].hand.size()
+ var kept_card: String=app.game.sides[0].hand[hand_size-1]
+ app.toggle_mulligan(0)
+ await process_frame
+ verify(app.mulligan_marks==[0],"Tapping a card marks it for replacement")
+ app.toggle_mulligan(0)
+ verify(app.mulligan_marks.is_empty(),"Tapping again unmarks it")
+ app.toggle_mulligan(0)
+ await process_frame
+ app.confirm_mulligan(true)
+ await process_frame
+ verify(not is_instance_valid(app.modal) and app.game.sides[0].mulligan_done and app.game.sides[0].hand.size()==hand_size,"Confirming swaps cards and returns to the battle")
+ verify(hand_size<2 or app.game.sides[0].hand[hand_size-2]==kept_card,"Unmarked cards are kept, replacements join at the end")
+ verify(app.game.sides[1].mulligan_done,"The rival has already used its mulligan")
+ app.show_mulligan()
+ verify(not is_instance_valid(app.modal),"Mulligan cannot be repeated")
  app.generation += 1
  app.queue_free()
  await process_frame
